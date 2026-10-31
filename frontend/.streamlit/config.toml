@@ -1,0 +1,40 @@
+[server]
+maxUploadSize = 20
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+
+# Simple light theme (matches the Figma design): white sidebar, light grey page, white cards, blue actions. Font: Inter.
+[theme]
+base = "light"
+primaryColor = "#2563EB"
+backgroundColor = "#F8FAFC"
+secondaryBackgroundColor = "#F1F5F9"
+textColor = "#0F172A"
+linkColor = "#1D4ED8"
+borderColor = "#E2E8F0"
+showWidgetBorder = true
+dataframeBorderColor = "#CBD5E1"
+dataframeHeaderBackgroundColor = "#E2E8F0"
+greenColor = "#15803D"
+yellowColor = "#B45309"
+redColor = "#B91C1C"
+blueColor = "#1D4ED8"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, Segoe UI, sans-serif"
+headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, Segoe UI, sans-serif"
+headingFontWeights = [700, 700, 600, 600, 600, 600]
+codeFont = "monospace"
+baseFontSize = 14
+baseRadius = "8px"
+buttonRadius = "8px"
+
+[theme.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F8FAFC"
+textColor = "#334155"
+primaryColor = "#2563EB"
+borderColor = "#E2E8F0"

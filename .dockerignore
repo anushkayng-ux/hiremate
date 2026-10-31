@@ -1,0 +1,9 @@
+.venv
+data
+.pytest_cache
+**/__pycache__
+.env
+run.bat
+run_mac.command
+setup_log.txt
+frontend/timing.log
