@@ -223,7 +223,7 @@ def do_create_job(text: str, by: str, st: dict, file_name: str | None = None) ->
     st["ctx"].pop("jd", None)
     sg = [s for s in recruit.compute_job(j["id"], "suggested") if s["score"] >= 40][:2]
     msg = (f"Done. \"{j['title']}\" has been created with {len(j['must'])} must-have skills"
-           f"{f' and {j['min_years']:g}+ years' if j['min_years'] else ''}.")
+           + (f" and {j['min_years']:g}+ years" if j['min_years'] else "") + ".")
     if sg:
         msg += f" {sg[0]['name']} from your talent pool fits best ({sg[0]['score']}%)."
     return R(msg, badge="Action", link={"page": "job", "job_id": j["id"], "label": "Open job"},
@@ -719,7 +719,7 @@ def route(text: str, attachments: list[dict], st: dict, user: dict, page: dict |
             st["pending"] = {"type": "createJob", "text": a["text"], "file_name": a["name"]}
             return R(f"This looks like a job description for \"{p['title']}\" ({p['location']}). I found "
                      f"{len(p['must'])} must-haves: {', '.join(p['must']) or 'none'}"
-                     f"{f', and {p['min_years']:g}+ years' if p['min_years'] else ''}. Shall I create the job?",
+                     + (f", and {p['min_years']:g}+ years" if p['min_years'] else "") + ". Shall I create the job?",
                      awaiting_yes=True, suggestions=["Yes, create the job", "Who matches this JD?",
                                                      "Save it to the knowledge store", "Check this JD for bias"])
         if cvs:
