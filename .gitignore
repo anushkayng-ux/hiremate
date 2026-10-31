@@ -1,0 +1,8 @@
+.env
+data/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+setup_log.txt
+frontend/timing.log
