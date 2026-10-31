@@ -21,10 +21,21 @@ st.set_page_config(page_title="HireMate", page_icon="✦", layout="wide", initia
 ui.setup()
 
 
+def _fill(ek, pk, email, pw):
+    st.session_state[ek], st.session_state[pk] = email, pw
+
+
 def _signin_recruiter():
+    st.markdown('<p class="small muted" style="margin:.2rem 0">Try a demo account (one click):</p>', unsafe_allow_html=True)
+    a, b, c = st.columns(3)
+    for col, (lbl, em) in zip((a, b, c), [("Admin", "muskan@hiremate.demo"), ("Recruiter", "recruiter@hiremate.demo"),
+                                           ("Interviewer", "interviewer@hiremate.demo")]):
+        col.button(lbl, key=f"d_{lbl}", width="stretch", on_click=_fill, args=("r_email", "r_pw", em, "recruit123"))
+    st.session_state.setdefault("r_email", "muskan@hiremate.demo")
+    st.session_state.setdefault("r_pw", "recruit123")
     with st.form("login", border=True):
-        email = st.text_input("Work email", value="muskan@hiremate.demo")
-        pw = st.text_input("Password", type="password", placeholder="recruit123")
+        email = st.text_input("Work email", key="r_email")
+        pw = st.text_input("Password", type="password", key="r_pw")
         if st.form_submit_button("Sign in", type="primary", width="stretch"):
             try:
                 r = api.login(email, pw)
@@ -35,15 +46,20 @@ def _signin_recruiter():
                 st.error(e.detail if e.status else "Can't reach the server.")
             except Exception:  # noqa: BLE001
                 st.error("Can't reach the HireMate server. Is the backend running?")
-    st.caption("Demo: muskan@hiremate.demo (Admin), recruiter@hiremate.demo, interviewer@hiremate.demo · password recruit123")
 
 
 def _signin_candidate():
     have, new = st.tabs(["I have an account", "New here? Apply with your CV"])
     with have:
+        st.markdown('<p class="small muted" style="margin:.2rem 0">Try a demo candidate (one click):</p>', unsafe_allow_html=True)
+        a, b = st.columns(2)
+        for col, (lbl, em) in zip((a, b), [("Arjun Mehta", "arjun.mehta@example.com"), ("Priya Nair", "priya.nair@example.com")]):
+            col.button(lbl, key=f"dc_{lbl}", width="stretch", on_click=_fill, args=("c_email", "c_pw", em, "candidate123"))
+        st.session_state.setdefault("c_email", "arjun.mehta@example.com")
+        st.session_state.setdefault("c_pw", "candidate123")
         with st.form("clogin", border=True):
-            email = st.text_input("Your email", value="arjun.mehta@example.com")
-            pw = st.text_input("Password", type="password", placeholder="candidate123")
+            email = st.text_input("Your email", key="c_email")
+            pw = st.text_input("Password", type="password", key="c_pw")
             if st.form_submit_button("Sign in", type="primary", width="stretch"):
                 try:
                     r = api.portal_login(email, pw)
@@ -52,8 +68,6 @@ def _signin_candidate():
                     st.rerun()
                 except api.ApiError as e:
                     st.error(e.detail if e.status else "Can't reach the server.")
-        st.caption("Demo: every sample candidate can sign in with their email (e.g. arjun.mehta@example.com, "
-                   "priya.nair@example.com) and password candidate123.")
     with new:
         try:
             jobs = api.public_jobs()
@@ -80,21 +94,27 @@ def _signin_candidate():
 
 
 def login_page():
-    _, mid, _ = st.columns([1, 1.3, 1])
-    with mid:
-        st.markdown('<div style="height:5vh"></div><p class="eyb">Vishal Mega Mart · Careers & HR</p>', unsafe_allow_html=True)
-        st.markdown("# Welcome to HireMate")
+    left, right = st.columns([1.05, 1], gap="large", vertical_alignment="center")
+    with left:
+        st.markdown(
+            '<div class="hero"><p class="eyb" style="color:#BFDBFE">Vishal Mega Mart · Careers & HR</p>'
+            '<h1 style="color:#fff;margin:.2rem 0 .6rem;font-size:2.4rem;line-height:1.15">Hire the right people,<br>faster.</h1>'
+            '<p style="color:#DBEAFE;font-size:1.05rem;margin:0 0 1.2rem">HireMate reads CVs, ranks candidates, '
+            'writes interview questions and drafts emails. You stay in charge.</p>'
+            '<div class="hp">✓ &nbsp;Upload CVs and job descriptions</div>'
+            '<div class="hp">✓ &nbsp;Best match first, with skills and gaps</div>'
+            '<div class="hp">✓ &nbsp;AI drafts emails. You press Send</div>'
+            '<div class="hp">✓ &nbsp;Candidates reply in their own portal</div></div>', unsafe_allow_html=True)
+    with right:
+        st.markdown('<p class="eyb">Sign in</p>', unsafe_allow_html=True)
+        st.markdown("## Welcome to HireMate")
         who = st.segmented_control("I am", ["Recruiter", "Candidate"], default="Recruiter", label_visibility="collapsed") \
             or "Recruiter"
         if who == "Recruiter":
-            st.markdown('<p class="muted">Recruiter portal: jobs, CVs, matching, interviews and emails, with AI.</p>',
-                        unsafe_allow_html=True)
             _signin_recruiter()
         else:
-            st.markdown('<p class="muted">Candidate portal: see your applications, read and reply to messages, '
-                        'confirm interviews and apply for jobs.</p>', unsafe_allow_html=True)
             _signin_candidate()
-        st.caption("All data is synthetic.")
+        st.caption("All data is synthetic. Demo only.")
 
 
 if "token" not in st.session_state:

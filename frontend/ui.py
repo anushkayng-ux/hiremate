@@ -20,6 +20,8 @@ STAGE_COLOR = {"Applied": ("#334155", "#F1F5F9"), "Screening": ("#92400E", "#FEF
 
 CSS = """
 <style>
+.hero{background:linear-gradient(135deg,#1D4ED8 0%,#2563EB 55%,#38BDF8 100%);border-radius:20px;padding:2.2rem 2rem;box-shadow:0 12px 30px rgba(37,99,235,.25)}
+.hero .hp{color:#fff;background:rgba(255,255,255,.14);border-radius:12px;padding:.55rem .9rem;margin:.4rem 0;font-weight:500}
 :root{--line:#E2E8F0;--fg:#0F172A;--muted:#475569;--accent:#2563EB}
 .stApp{background:#F8FAFC}
 [data-testid="stHeader"]{background:transparent;height:2.2rem}
