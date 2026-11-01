@@ -68,23 +68,48 @@ def _call_inner(method: str, path: str, **kw):
     return r.json() if "json" in ct else r.content
 
 
+_NO_CACHE = ("/ai/", "/assistant", "/settings/logs", "/knowledge/files", "/export")
+_TTL = 12.0   # seconds. Every click re-runs the page, so repeat reads are served from memory.
+
+
 def get(path, **params):
-    return _call("GET", path, params={k: v for k, v in params.items() if v not in (None, "")})
+    q = {k: v for k, v in params.items() if v not in (None, "")}
+    if any(x in path for x in _NO_CACHE):
+        return _call("GET", path, params=q)
+    cache = st.session_state.setdefault("_gc", {})
+    key = (path, tuple(sorted(q.items())))
+    hit = cache.get(key)
+    now = _time.monotonic()
+    if hit and now - hit[0] < _TTL:
+        return hit[1]
+    out = _call("GET", path, params=q)
+    if len(cache) > 80:
+        cache.clear()
+    cache[key] = (now, out)
+    return out
+
+
+def _fresh():
+    st.session_state.pop("_gc", None)   # any change makes cached reads stale
 
 
 def post(path, json=None, data=None, files=None):
+    _fresh()
     return _call("POST", path, json=json, data=data, files=files)
 
 
 def patch(path, json=None, **params):
+    _fresh()
     return _call("PATCH", path, json=json, params=params or None)
 
 
 def put(path, json=None, **params):
+    _fresh()
     return _call("PUT", path, json=json, params=params or None)
 
 
 def delete(path):
+    _fresh()
     return _call("DELETE", path)
 
 
@@ -119,6 +144,7 @@ def portal_signup(name: str, email: str, password: str, job_id: int | None, f) -
 def stream_chat(data, files=None):
     """Generator: yields ("delta", text) while the AI writes, then ("final", reply dict)."""
     import json as _json
+    _fresh()
     try:
         r = _session().post(API_URL + "/assistant/chat/stream", headers=_headers(), data=data, files=files,
                             stream=True, timeout=120)
