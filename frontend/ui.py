@@ -183,6 +183,50 @@ section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a span{font-size:.
 [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:last-child{flex:1 1 auto}
 [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:last-child > [data-testid="stVerticalBlock"]{flex:1 1 auto}
 .block-container{max-width:1320px!important}
+
+/* ---- polish: one spacing system (tight but calm) ---- */
+.block-container{padding:1rem 2rem 6.5rem!important}
+[data-testid="stMain"] [data-testid="stVerticalBlock"]{gap:.8rem}
+[data-testid="stHorizontalBlock"]{gap:1rem!important}
+h1{font-size:1.6rem!important;line-height:1.2!important;margin:0 0 .1rem!important}
+[data-testid="stElementContainer"]:has(h1) + [data-testid="stElementContainer"] p{color:#64748B;font-size:.95rem;margin:0 0 .2rem}
+h2{font-size:1.2rem!important;margin:.3rem 0 .2rem!important}
+h3{font-size:1.02rem!important;line-height:1.3!important;margin:0 0 .35rem!important;color:#0F172A}
+/* cards */
+[data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"]:not(.st-key-askfab){padding:1rem 1.15rem 1.1rem!important;gap:.65rem!important;
+  border:1px solid #E6E9F2!important;border-radius:14px!important;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+[data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"]{box-shadow:none;padding:.7rem .9rem!important}
+[data-testid="stMarkdownContainer"] p{line-height:1.5;margin:0 0 .2rem}
+.muted{color:#64748B}
+/* rows inside cards: avatar + text + button line up */
+.prow{align-items:center;gap:.75rem}
+.pname{font-weight:600}
+[data-testid="stHorizontalBlock"]{align-items:stretch}
+/* buttons and inputs: one height */
+button[data-testid^="stBaseButton"]{min-height:2.3rem;font-weight:500}
+[data-baseweb="input"] input,[data-baseweb="select"]>div{min-height:2.3rem}
+[data-testid="stTabs"] [role="tablist"]{gap:.25rem;margin-bottom:.4rem}
+[data-testid="stExpander"] summary{padding:.55rem .8rem}
+/* sidebar */
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a{padding:.5rem .75rem;margin:.1rem .4rem}
+section[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:.6rem}
+/* pills, tags and chips */
+.pill,.tag,.score{line-height:1.5;vertical-align:middle}
+.kpi{line-height:1.1}.kpil{color:#64748B}
+
+/* ---- polish 2 ---- */
+h1 + p, [data-testid="stMarkdownContainer"] h1 + p{color:#64748B!important;font-size:.95rem}
+[data-testid="stElementContainer"]:has(+ [data-testid="stLayoutWrapper"]){margin-bottom:.3rem}
+[data-testid="stPopover"] button, [data-testid="stPopoverButton"]{min-height:2.3rem!important;height:2.3rem}
+[data-testid="stLayoutWrapper"] [data-testid="stHorizontalBlock"]{margin-bottom:.25rem}
+.kpi-box,[data-testid="stLayoutWrapper"]:has(.kpil) > [data-testid="stVerticalBlock"]{padding:.8rem 1.1rem!important;gap:.15rem!important}
+.kpi{margin-bottom:.1rem}
+[data-testid="stMain"] [data-testid="stHorizontalBlock"] [data-testid="stVerticalBlock"]{gap:.7rem}
+.prow + .prow{margin-top:.4rem}
+.block-container{max-width:1360px!important}
+
+.kpil{margin-top:.2rem;padding-bottom:.35rem;line-height:1.3}
+.kpi{padding-top:.15rem}
 </style>
 """
 
