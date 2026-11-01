@@ -410,3 +410,25 @@ def test_specific_answers_without_ai(c):
     assert r["table"]["rows"]
     r = chat(c, "zzzz qqqq", sid)
     assert "not in the data" in r["reply"].lower() and r["bullets"]
+
+
+def test_logs_admin_only_and_settings_roles(c):
+    from fastapi.testclient import TestClient
+    r = c.get("/settings/logs", params={"limit": 5})
+    assert r.status_code == 200 and r.json()["total"] >= 1 and r.json()["actions"]
+    assert any(x["action"] == "Signed in" for x in c.get("/settings/logs", params={"action": "Signed in"}).json()["rows"])
+    assert c.get("/settings/logs/export").json()["csv"].startswith("When,Who,What,Details")
+    assert c.get("/settings/logs", params={"q": "zzzznomatch"}).json()["total"] == 0
+    with TestClient(app) as iv:
+        t = iv.post("/auth/login", json={"email": "interviewer@hiremate.demo", "password": "recruit123"}).json()["token"]
+        iv.headers["Authorization"] = "Bearer " + t
+        assert iv.get("/settings/logs").status_code == 403
+        assert iv.get("/settings/activity").status_code == 403
+        assert iv.get("/settings/ai").status_code == 403
+        assert iv.get("/settings/users").status_code == 403
+        assert iv.get("/settings").status_code == 200     # read-only flags the pages need
+    with TestClient(app) as rc:
+        t = rc.post("/auth/login", json={"email": "recruiter@hiremate.demo", "password": "recruit123"}).json()["token"]
+        rc.headers["Authorization"] = "Bearer " + t
+        assert rc.get("/settings/logs").status_code == 403
+        assert rc.get("/settings/ai").status_code == 200
