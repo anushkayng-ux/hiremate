@@ -128,6 +128,7 @@ if tab == "Overview":
             if b.button("Write with AI" if key not in st.session_state else "Rewrite", key="sumbtn", width="stretch"):
                 with st.spinner("AI is reading the CV…"):
                     st.session_state[key] = api.get("/ai/summary", job_id=jid, candidate_id=cid)
+                st.rerun()
             if key in st.session_state:
                 s = st.session_state[key]
                 st.markdown(s["text"])
@@ -240,6 +241,7 @@ if tab == "Interview":
             if st.button("Write questions with AI" if qk not in st.session_state else "Regenerate"):
                 with st.spinner("Writing questions from the CV and the job…"):
                     st.session_state[qk] = api.get("/ai/questions", job_id=jid, candidate_id=cid)["questions"]
+                st.rerun()
             for i, q in enumerate(st.session_state.get(qk, [])):
                 with st.container(border=True):
                     ui.html_block(f'<span class="eyb">{ui.esc(q.get("type"))} · {ui.esc(q.get("skill", ""))}</span><br>'
@@ -251,6 +253,7 @@ if tab == "Interview":
                 st.session_state[ak] = cur["assessment"]
             if st.button("Write a task with AI" if ak not in st.session_state else "Regenerate assessment"):
                 st.session_state[ak] = api.get("/ai/assessment", job_id=jid, candidate_id=cid)["text"]
+                st.rerun()
             if st.session_state.get(ak):
                 st.text(st.session_state[ak])
 
