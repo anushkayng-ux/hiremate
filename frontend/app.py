@@ -93,7 +93,18 @@ def _signin_candidate():
                         st.error(e.detail)
 
 
+LOGIN_CSS = """<style>
+.block-container{max-width:1180px!important;padding-top:1.4rem!important}
+.hero{min-height:calc(100vh - 5.5rem);display:flex;flex-direction:column;justify-content:center;padding:2.8rem 2.5rem!important;border-radius:26px!important}
+.hero h1{font-size:2.9rem!important;line-height:1.1!important}
+.hero p{font-size:1.1rem}
+.hero .hp{font-size:1.02rem!important;padding:.75rem 1rem!important;margin:.5rem 0!important}
+.eyb{font-size:.8rem}
+</style>"""
+
+
 def login_page():
+    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
     left, right = st.columns([1.05, 1], gap="large", vertical_alignment="center")
     with left:
         st.markdown(

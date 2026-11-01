@@ -175,6 +175,14 @@ section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a span{font-size:.
 [data-testid="stChatMessage"] ul,[data-testid="stChatMessage"] ol{margin:.1rem 0 .55rem;padding-left:1.2rem}
 [data-testid="stChatMessage"] li{margin:.15rem 0;line-height:1.45}
 [data-testid="stChatMessage"] strong{color:#0f172a}
+
+/* ---- steady layout: side-by-side boxes end at the same line ---- */
+[data-testid="stHorizontalBlock"]{align-items:stretch}
+[data-testid="stColumn"]{display:flex!important;flex-direction:column}
+[data-testid="stColumn"] > [data-testid="stVerticalBlock"]{flex:1 1 auto}
+[data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:last-child{flex:1 1 auto}
+[data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:last-child > [data-testid="stVerticalBlock"]{flex:1 1 auto}
+.block-container{max-width:1320px!important}
 </style>
 """
 
