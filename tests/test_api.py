@@ -365,15 +365,15 @@ def test_candidate_portal_full_loop(c):
         p.post(f"/portal/interviews/{iv['id']}/respond", json={"response": "Confirmed"}, headers=ph)
         assert any("confirmed" in m["subject"].lower() for m in c.get("/emails/inbox/list").json())
     # sign-up with a CV creates a candidate who is matched to the job
-    cv = ("Ravi Kumar\nLocation: Noida\nSummary: Store supervisor.\nExperience:\nStore Supervisor | ShopRite, Noida | "
+    cv = ("Test Candidate\nLocation: Noida\nSummary: Store supervisor.\nExperience:\nStore Supervisor | QuickShop, Noida | "
           "Jan 2019 – Present\n- Led a team of 12 associates on the floor.\n- Ran weekly inventory counts.\n"
           "Skills: store operations, team management, inventory, customer service, POS, Excel")
-    s = p.post("/portal/signup", data={"name": "Ravi Kumar", "email": "ravi.k@example.com", "password": "secret1",
-                                       "job_id": jid, "text": cv})
+    s = p.post("/portal/signup", data={"name": "Test Candidate", "email": "test.candidate@example.com", "password": "secret1",
+                                       "job_id": jid, "text": cv, "consent": "true"})
     assert s.status_code == 200, s.text
     nh = {"Authorization": "Bearer " + s.json()["token"]}
     assert p.get("/portal/applications", headers=nh).json()[0]["job_id"] == jid
-    assert any(x["name"] == "Ravi Kumar" for x in c.get(f"/match/job/{jid}").json())
+    assert any(x["name"] == "Test Candidate" for x in c.get(f"/match/job/{jid}").json())
 
 
 def test_team_management(c):
