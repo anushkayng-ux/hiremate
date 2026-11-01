@@ -63,77 +63,125 @@ class GeminiLLM:
 
     BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
-    def _pick_model(self) -> str | None:
-        """Ask Google which models this key can use and choose a Flash model."""
-        r = requests.get(self.BASE, params={"key": self.key, "pageSize": 100}, timeout=config.LLM_TIMEOUT)
-        r.raise_for_status()
-        names = [m["name"].split("/", 1)[-1] for m in r.json().get("models", [])
-                 if "generateContent" in m.get("supportedGenerationMethods", [])]
-        def rank(n: str):
-            bad = any(x in n for x in ("lite", "image", "tts", "live", "thinking", "embedding", "audio", "preview", "exp"))
-            return (bad, "flash" not in n, n != "gemini-flash-latest", n)
-        good = sorted((n for n in names if n.startswith("gemini") and "flash" in n), key=rank)
-        return good[0] if good else None
+    PREFER = ("gemini-2.5-flash-lite", "gemini-flash-lite-latest", "gemini-2.0-flash-lite", "gemini-2.0-flash",
+              "gemini-2.5-flash", "gemini-flash-latest")
+    RETRY = (404, 429, 500, 502, 503, 504)
+
+    def _models(self) -> list[str]:
+        """Models to try, best first. Busy or missing ones are skipped for a few minutes."""
+        import time
+        if not getattr(self, "_all", None):
+            try:
+                r = requests.get(self.BASE, params={"key": self.key, "pageSize": 100}, timeout=(5, 10))
+                r.raise_for_status()
+                names = [m["name"].split("/", 1)[-1] for m in r.json().get("models", [])
+                         if "generateContent" in m.get("supportedGenerationMethods", [])]
+                ok = [n for n in names if n.startswith("gemini") and "flash" in n
+                      and not any(x in n for x in ("image", "tts", "live", "thinking", "embedding", "audio", "preview", "exp"))]
+                pref = [n for n in self.PREFER if n in ok]
+                self._all = pref + sorted(n for n in ok if n not in pref)
+            except Exception as e:  # noqa: BLE001
+                log.warning("Gemini model list failed (%s)", type(e).__name__)
+                self._all = []
+            if self.model and self.model not in self._all and not self._all:
+                self._all = [self.model]
+        bad = getattr(self, "_bad", {})
+        now = time.time()
+        order = [self.model] if self.model in self._all else []
+        order += [m for m in self._all if m != self.model]
+        fresh = [m for m in order if now - bad.get(m, 0) > 300]
+        return fresh or order or [self.model]
+
+    def _mark(self, model: str) -> None:
+        import time
+        if not hasattr(self, "_bad"):
+            self._bad = {}
+        self._bad[model] = time.time()
+
+    def _use(self, model: str) -> None:
+        if model != self.model:
+            self.model = model
+            self.name = f"Gemini ({model}){' · paid' if self.paid else ' · free tier'}"
+            log.info("Gemini model switched to %s", model)
 
     @staticmethod
     def _gen_cfg(model: str, max_tokens: int) -> dict:
-        cfg = {"temperature": 0.2, "maxOutputTokens": max_tokens}
+        cfg = {"temperature": 0.3, "maxOutputTokens": max_tokens}
         if "2.5" in model or "flash-latest" in model:
             cfg["thinkingConfig"] = {"thinkingBudget": 0}   # no hidden "thinking": answers start in about a second
         return cfg
 
-    def stream(self, prompt: str, system: str = SYSTEM, max_tokens: int = 900):
-        """Yield the answer in small pieces as Gemini writes it."""
-        import json as _json
-        for attempt in (0, 1):
-            r = requests.post(f"{self.BASE}/{self.model}:streamGenerateContent", params={"key": self.key, "alt": "sse"},
-                              stream=True, timeout=config.LLM_TIMEOUT, json={
-                "systemInstruction": {"parts": [{"text": system}]},
+    def _body(self, model: str, prompt: str, system: str, max_tokens: int) -> dict:
+        return {"systemInstruction": {"parts": [{"text": system}]},
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": self._gen_cfg(self.model, max_tokens)})
-            if r.status_code == 404 and attempt == 0:
-                alt = self._pick_model()
-                if alt and alt != self.model:
-                    self.model = alt
-                    self.name = f"Gemini ({alt}){' · paid' if self.paid else ' · free tier'}"
-                    continue
-            if r.status_code >= 400:
-                raise RuntimeError(f"Gemini {r.status_code} for model {self.model}: {r.text[:200]}")
-            for line in r.iter_lines(decode_unicode=True):
-                if line and line.startswith("data:"):
-                    try:
-                        parts = _json.loads(line[5:])["candidates"][0]["content"]["parts"]
-                    except (KeyError, IndexError, ValueError):
-                        continue
-                    txt = "".join(p.get("text", "") for p in parts)
-                    if txt:
-                        yield txt
-            return
+                "generationConfig": self._gen_cfg(model, max_tokens)}
 
-    def _call(self, model: str, prompt: str, system: str, max_tokens: int) -> str:
-        r = requests.post(f"{self.BASE}/{model}:generateContent", params={"key": self.key}, timeout=config.LLM_TIMEOUT, json={
-            "systemInstruction": {"parts": [{"text": system}]},
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": self._gen_cfg(model, max_tokens)})
-        if r.status_code >= 400:
-            # never put the key (it is in the URL) into logs or errors
-            raise RuntimeError(f"Gemini {r.status_code} for model {model}: {r.text[:200]}")
-        return "".join(p.get("text", "") for p in r.json()["candidates"][0]["content"]["parts"])
+    def stream(self, prompt: str, system: str = SYSTEM, max_tokens: int = 900):
+        """Yield the answer in small pieces as Gemini writes it. If a model is busy, the next one is tried at once."""
+        import json as _json
+        last = "no model"
+        for model in self._models()[:4]:
+            try:
+                r = requests.post(f"{self.BASE}/{model}:streamGenerateContent", params={"key": self.key, "alt": "sse"},
+                                  stream=True, timeout=(5, 20), json=self._body(model, prompt, system, max_tokens))
+            except requests.RequestException as e:
+                last = f"{type(e).__name__} on {model}"
+                self._mark(model)
+                continue
+            if r.status_code in self.RETRY:
+                last = f"{r.status_code} on {model}"
+                self._mark(model)
+                continue
+            if r.status_code >= 400:
+                raise RuntimeError(f"Gemini {r.status_code} for model {model}: {r.text[:200]}")
+            self._use(model)
+            got = False
+            try:
+                for line in r.iter_lines(decode_unicode=True):
+                    if line and line.startswith("data:"):
+                        try:
+                            parts = _json.loads(line[5:])["candidates"][0]["content"]["parts"]
+                        except (KeyError, IndexError, ValueError):
+                            continue
+                        txt = "".join(p.get("text", "") for p in parts)
+                        if txt:
+                            got = True
+                            yield txt
+            except requests.RequestException:
+                if got:
+                    return
+                self._mark(model)
+                continue
+            if got:
+                return
+            self._mark(model)
+        raise RuntimeError(f"Gemini is busy ({last})")
 
     def generate(self, prompt: str, system: str = SYSTEM, max_tokens: int = 900) -> str:
-        try:
-            return self._call(self.model, prompt, system, max_tokens)
-        except RuntimeError as e:
-            if " 404 " not in str(e) and "not found" not in str(e).lower():
-                raise
-            alt = self._pick_model()
-            if not alt or alt == self.model:
-                raise
-            out = self._call(alt, prompt, system, max_tokens)
-            self.model = alt
-            self.name = f"Gemini ({alt}){' · paid' if self.paid else ' · free tier'}"
-            log.info("Gemini model switched to %s", alt)
+        last = "no model"
+        for model in self._models()[:4]:
+            try:
+                r = requests.post(f"{self.BASE}/{model}:generateContent", params={"key": self.key}, timeout=(5, 25),
+                                  json=self._body(model, prompt, system, max_tokens))
+            except requests.RequestException as e:
+                last = f"{type(e).__name__} on {model}"
+                self._mark(model)
+                continue
+            if r.status_code in self.RETRY:
+                last = f"{r.status_code} on {model}"
+                self._mark(model)
+                continue
+            if r.status_code >= 400:
+                # never put the key (it is in the URL) into logs or errors
+                raise RuntimeError(f"Gemini {r.status_code} for model {model}: {r.text[:200]}")
+            try:
+                out = "".join(p.get("text", "") for p in r.json()["candidates"][0]["content"]["parts"])
+            except (KeyError, IndexError, ValueError):
+                self._mark(model)
+                continue
+            self._use(model)
             return out
+        raise RuntimeError(f"Gemini is busy ({last})")
 
 
 class ClaudeLLM:
@@ -249,6 +297,8 @@ def test_connection() -> dict:
         hint = {400: "the model name may be wrong", 401: "the key is not valid", 403: "the key is not allowed",
                 404: "the model name may be wrong", 429: "free limit reached, try again in a minute"}.get(code, "")
         return {"ok": False, "message": f"The AI service said no ({code}){': ' + hint if hint else ''}."}
+    except RuntimeError as e:
+        return {"ok": False, "message": str(e)[:160]}
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "message": f"Couldn't reach the AI service ({type(e).__name__})."}
 
