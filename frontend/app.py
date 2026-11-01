@@ -154,6 +154,7 @@ pages = {
     "analytics": st.Page(V / "analytics.py", title="Reports", url_path="reports", visibility="hidden"),
     "screening": st.Page(V / "screening.py", title="Compare", url_path="compare", visibility="hidden"),
     "team": st.Page(V / "team.py", title="Team", url_path="team", visibility="hidden"),
+    "logs": st.Page(V / "logs.py", title="Logs", icon=":material/receipt_long:", url_path="logs"),
     "asha": st.Page(V / "ask_ai.py", title="Ask AI", url_path="ask-ai", visibility="hidden"),
     "job": st.Page(V / "job.py", title="Job", url_path="job", visibility="hidden"),
     "review": st.Page(V / "review.py", title="Quick review", url_path="review", visibility="hidden"),
@@ -163,8 +164,17 @@ ui.PAGES.update(pages)
 
 st.logo(str(Path(__file__).parent / "logo.svg"), size="large")
 
-nav = st.navigation([pages[k] for k in ("dashboard", "jobs", "candidates", "interviews", "settings", "knowledge",
-                                         "analytics", "screening", "team", "asha", "job", "review", "candidate")])
+_role = st.session_state.user["role"]
+_keys = ["dashboard", "jobs", "candidates", "interviews"]
+if _role in ("Admin", "Recruiter"):       # Settings, Documents, Team: Admin and Recruiter only
+    _keys += ["settings", "knowledge", "team"]
+if _role == "Admin":                      # Logs: Admin only
+    _keys += ["logs"]
+_keys += ["analytics", "screening", "asha", "job", "review", "candidate"]
+for _k in ("settings", "knowledge", "team", "logs"):
+    if _k not in _keys:
+        ui.PAGES.pop(_k, None)
+nav = st.navigation([pages[k] for k in _keys])
 
 with st.sidebar:
     u = st.session_state.user

@@ -185,6 +185,9 @@ def esc(s) -> str:
 def go(page: str, **state) -> None:
     for k, v in state.items():
         st.session_state[k] = v
+    if page not in PAGES:  # this role has no access to that page
+        st.session_state["_toast"] = "Your role cannot open that page."
+        page = "dashboard"
     st.switch_page(PAGES[page])
 
 
