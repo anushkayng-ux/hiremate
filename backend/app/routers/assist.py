@@ -79,6 +79,46 @@ def summary(job_id: int, candidate_id: int, u=Depends(current_user)):
     return assist.summary(job_id, candidate_id)
 
 
+_BRIEF: dict = {}
+_FOCUS = {
+    "home": "the Home page. Say what needs attention today and who to act on first.",
+    "jobs": "the Jobs list. Compare the open jobs: where applicants are piling up and which job needs action.",
+    "job": "the page of the job named below. Say how its candidates look, who leads and why, and the next action.",
+    "candidates": "the Candidates list. Say who looks strongest across jobs and who is waiting too long.",
+    "interviews": "the Interviews page. Say what is coming up, what feedback is missing and what to do next.",
+}
+
+
+@ai.get("/brief")
+def brief(page: str = "home", job_id: int | None = None, u=Depends(current_user)):
+    """A short AI-written note for the top of a page (cached until the data changes)."""
+    import hashlib
+    import time as _t
+    if page not in _FOCUS or not llm.get_llm():
+        return {"text": "", "ai": False}
+    snap = assistant.data_snapshot()
+    extra = ""
+    if page == "job" and job_id:
+        try:
+            extra = f" The job is: {recruit.get_job(job_id)['title']}."
+        except Exception:
+            pass
+    key = hashlib.md5(f"{page}{job_id}{snap}".encode()).hexdigest()
+    hit = _BRIEF.get(key)
+    if hit and _t.time() - hit[0] < 900:
+        return {"text": hit[1], "ai": True}
+    prompt = ("You are HireMate, a friendly recruiting assistant for the Vishal Mega Mart HR team. Write a short note for "
+              f"{_FOCUS[page]}{extra} Use ONLY the data below. Very simple words. 2 or 3 short sentences, under 55 words, "
+              "plain text, no headings, no bullets. Name the real people, jobs and numbers. End with one clear action.\n\n"
+              f"DATA:\n{snap}")
+    out = (llm.generate(prompt, max_tokens=220) or "").strip()
+    if out:
+        if len(_BRIEF) > 200:
+            _BRIEF.clear()
+        _BRIEF[key] = (_t.time(), out)
+    return {"text": out, "ai": bool(out)}
+
+
 @ai.get("/questions")
 def questions(job_id: int, candidate_id: int, u=Depends(current_user)):
     return assist.questions(job_id, candidate_id)
