@@ -8,33 +8,34 @@ gatherUsageStats = false
 [client]
 toolbarMode = "minimal"
 
-# Simple light theme (matches the Figma design): white sidebar, light grey page, white cards, blue actions. Font: Inter.
+# "Store aisle" theme: aubergine sidebar, cool grey canvas, white panels, till-green actions,
+# shelf-tag yellow for the one highlight. Headings Bricolage Grotesque, body Figtree.
 [theme]
 base = "light"
-primaryColor = "#2563EB"
-backgroundColor = "#F8FAFC"
-secondaryBackgroundColor = "#F1F5F9"
-textColor = "#0F172A"
-linkColor = "#1D4ED8"
-borderColor = "#E2E8F0"
+primaryColor = "#0E7A5C"
+backgroundColor = "#F2F3F6"
+secondaryBackgroundColor = "#EEEDF3"
+textColor = "#1E1B33"
+linkColor = "#0B6149"
+borderColor = "#E3E2EA"
 showWidgetBorder = true
-dataframeBorderColor = "#CBD5E1"
-dataframeHeaderBackgroundColor = "#E2E8F0"
-greenColor = "#15803D"
-yellowColor = "#B45309"
-redColor = "#B91C1C"
-blueColor = "#1D4ED8"
-font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, Segoe UI, sans-serif"
-headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, Segoe UI, sans-serif"
-headingFontWeights = [700, 700, 600, 600, 600, 600]
+dataframeBorderColor = "#D4D2DE"
+dataframeHeaderBackgroundColor = "#EEEDF3"
+greenColor = "#0E7A5C"
+yellowColor = "#7A4D00"
+redColor = "#B42318"
+blueColor = "#2B2350"
+font = "Figtree:https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap, Segoe UI, sans-serif"
+headingFont = "Bricolage Grotesque:https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,700&display=swap, Figtree, sans-serif"
+headingFontWeights = [700, 700, 650, 650, 600, 600]
 codeFont = "monospace"
 baseFontSize = 14
-baseRadius = "8px"
-buttonRadius = "8px"
+baseRadius = "10px"
+buttonRadius = "10px"
 
 [theme.sidebar]
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F8FAFC"
-textColor = "#334155"
-primaryColor = "#2563EB"
-borderColor = "#E2E8F0"
+backgroundColor = "#2B2350"
+secondaryBackgroundColor = "#3A3166"
+textColor = "#E9E6F5"
+primaryColor = "#FFD23F"
+borderColor = "#4A4178"
