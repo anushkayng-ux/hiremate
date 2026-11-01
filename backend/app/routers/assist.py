@@ -356,7 +356,7 @@ class AIIn(BaseModel):
 
 
 @sets.get("/ai")
-def get_ai(u=Depends(current_user)):
+def get_ai(u=Depends(rec)):
     return llm.public_settings()
 
 
@@ -383,7 +383,7 @@ def set_blind(on: bool, u=Depends(rec)):
 
 
 @sets.get("/users")
-def users(u=Depends(current_user)):
+def users(u=Depends(rec)):
     return db.rows("SELECT id, email, name, role, COALESCE(active,1) AS active, last_login, created_at FROM users ORDER BY id")
 
 
@@ -443,8 +443,52 @@ def reset_demo(u=Depends(admin)):
 
 
 @sets.get("/activity")
-def activity(limit: int = 50, u=Depends(current_user)):
+def activity(limit: int = 50, u=Depends(admin)):
     return db.rows("SELECT * FROM activity_logs ORDER BY id DESC LIMIT ?", (limit,))
+
+
+def _log_query(q: str, action: str, user: str, days: int):
+    where, args = [], []
+    if q.strip():
+        where.append("(lower(action) LIKE ? OR lower(COALESCE(detail,'')) LIKE ? OR lower(COALESCE(by_name,'')) LIKE ?)")
+        args += [f"%{q.strip().lower()}%"] * 3
+    if action:
+        where.append("action=?"); args.append(action)
+    if user:
+        where.append("by_name=?"); args.append(user)
+    if days > 0:
+        from datetime import datetime, timedelta
+        where.append("created_at>=?"); args.append((datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S"))
+    return (" WHERE " + " AND ".join(where)) if where else "", args
+
+
+@sets.get("/logs")
+def logs(q: str = "", action: str = "", user: str = "", days: int = 0, limit: int = 50, offset: int = 0,
+         u=Depends(admin)):
+    """Admin only: the full activity log with search, filters and paging."""
+    limit = max(1, min(limit, 200))
+    w, a = _log_query(q, action, user, days)
+    total = db.one("SELECT COUNT(*) n FROM activity_logs" + w, a)["n"]
+    rows = db.rows("SELECT id, action, detail, by_name, created_at, entity, candidate_id, job_id FROM activity_logs" + w
+                   + " ORDER BY id DESC LIMIT ? OFFSET ?", a + [limit, max(0, offset)])
+    return {"total": total, "rows": rows,
+            "actions": [r["action"] for r in db.rows("SELECT DISTINCT action FROM activity_logs ORDER BY action")],
+            "users": [r["by_name"] for r in db.rows("SELECT DISTINCT by_name FROM activity_logs WHERE by_name IS NOT NULL "
+                                                    "ORDER BY by_name")]}
+
+
+@sets.get("/logs/export")
+def logs_export(q: str = "", action: str = "", user: str = "", days: int = 0, u=Depends(admin)):
+    import csv, io
+    w, a = _log_query(q, action, user, days)
+    rows = db.rows("SELECT created_at, by_name, action, detail FROM activity_logs" + w + " ORDER BY id DESC LIMIT 5000", a)
+    buf = io.StringIO()
+    wr = csv.writer(buf)
+    wr.writerow(["When", "Who", "What", "Details"])
+    for r in rows:
+        wr.writerow([r["created_at"], r["by_name"], r["action"], r["detail"] or ""])
+    db.log("Log exported", f"{len(rows)} rows", u["name"], entity="auth")
+    return {"csv": buf.getvalue(), "rows": len(rows)}
 
 
 # ------------------------------------------------------------- screening criteria
@@ -512,7 +556,7 @@ def delete_criterion(cid: int, u=Depends(rec)):
 
 
 @sets.get("/guidelines")
-def get_guidelines(u=Depends(current_user)):
+def get_guidelines(u=Depends(rec)):
     return {"text": crit_svc.guidelines()}
 
 

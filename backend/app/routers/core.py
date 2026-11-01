@@ -28,10 +28,12 @@ class Login(BaseModel):
 def login(body: Login):
     u = db.one("SELECT * FROM users WHERE lower(email)=lower(?)", (body.email.strip(),))
     if not u or not check_pw(body.password, u["password_hash"]):
+        db.log("Sign-in failed", f"Wrong email or password for {body.email.strip()[:60]}", "Unknown", entity="auth")
         raise HTTPException(401, "Wrong email or password")
     if u.get("active") == 0:
         raise HTTPException(401, "This account is turned off. Ask an Admin.")
     db.run("UPDATE users SET last_login=? WHERE id=?", (db.now(), u["id"]))
+    db.log("Signed in", f"{u['role']} signed in", u["name"], entity="auth", entity_id=u["id"])
     return {"token": make_token(u), "user": {k: u[k] for k in ("id", "email", "name", "role")}}
 
 
