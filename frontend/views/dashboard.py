@@ -20,7 +20,6 @@ with h1:
                                                       "Here is what needs you today.")
 if h2.button("New job", icon=":material/add:", type="primary", width="stretch", disabled=not rec):
     ui.go("jobs", open_create=True)
-ui.ai_note("home")
 
 sets = ui.safe(api.get, "/settings") or {}
 if rec and not (sets.get("llm") or {}).get("connected"):

@@ -20,7 +20,6 @@ if st.button("← All jobs", type="tertiary"):
 h1, h2, h3, h4 = st.columns([3.4, 1, 1.1, 1.1], vertical_alignment="center")
 with h1:
     ui.header(job["title"], sub=f"{job['location']}  ·  {job['min_years']:g}+ years  ·  {job['status']}")
-ui.ai_note("job", job_id=job["id"])
 if h2.button("Ask AI", icon=":material/auto_awesome:", width="stretch"):
     import chat
     chat.open_window(f"Who matches {job['short']}? Show skills and gaps.")
