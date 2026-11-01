@@ -39,7 +39,7 @@ if sec == "Today":
     b = ui.safe(api.get, "/plus/briefing")
     if b:
         with st.container(border=True):
-            st.markdown(f"{pu.plus_badge()} **9 AM briefing**", unsafe_allow_html=True)
+            st.markdown(f"{pu.plus_badge()} **Today's briefing**", unsafe_allow_html=True)
             st.markdown(b["text"])
     left, right = st.columns([1.15, 1], gap="medium")
     with left:
@@ -131,7 +131,7 @@ if sec == "Talent pool":
                     ui.html_block(f'<div class="note" style="margin-top:.3rem">{ui.esc(a)}</div>')
     with right:
         with st.container(border=True):
-            pu.section("Re-engage silver list", "This month's 5 past candidates worth contacting again, with a message.")
+            pu.section("Re-engage silver list", "Up to 5 past candidates worth contacting again this month, each with a ready message.")
             for s in ui.safe(api.get, "/plus/silver") or []:
                 with st.expander(f"{ui.name(s['name'], s['candidate_id'])} · {s['job']} · {s['score']}%"):
                     st.text_area("Message", s["message"], height=100, key=f"sil{s['candidate_id']}")
@@ -146,7 +146,7 @@ if sec == "Talent pool":
                 for r in ru:
                     if st.checkbox(f"{ui.name(r['name'], r['candidate_id'])} · {r['score']}% · {r['why']}", key=f"ru{jid}{r['candidate_id']}"):
                         pick.append(r["candidate_id"])
-                if ru and st.button(f"Add {len(pick)} and draft invites", type="primary", disabled=not pick or not rec):
+                if ru and st.button(f"Add {len(pick)} and draft invites" if pick else "Tick people above to add them", type="primary", disabled=not pick or not rec):
                     res = api.post(f"/plus/runners-up/{jid}/invite", json={"candidate_ids": pick})
                     ui.toast_next(res["text"])
                     st.rerun()
@@ -274,11 +274,11 @@ if sec == "Messages":
             stg = st.selectbox("Stage", ui.FLOW, format_func=ui.LABEL.get, key="bs")
             if jid:
                 pv = api.get(f"/plus/bulk/{jid}", stage=stg)
-                st.caption(f"{len(pv)} people")
+                st.caption(f"{len(pv)} {'person' if len(pv) == 1 else 'people'}")
                 for p in pv[:3]:
                     with st.expander(f"Preview: {ui.name(p['name'], p['candidate_id'])}"):
                         st.text(p["body"])
-                if st.button(f"Make {len(pv)} drafts", type="primary", disabled=not pv or not rec):
+                if st.button(f"Make {len(pv)} draft{'' if len(pv) == 1 else 's'}", type="primary", disabled=not pv or not rec):
                     ui.toast_next(api.post(f"/plus/bulk/{jid}?stage={stg}")["text"])
                     st.rerun()
         with st.container(border=True):
@@ -350,7 +350,7 @@ if sec == "Decisions & team":
                 api.put("/plus/blind-first", json={"on": on})
                 pu._blind_state.clear()
                 st.rerun()
-            st.caption(f"{len(bfs['revealed'])} people marked interested so far.")
+            st.caption(f"{len(bfs['revealed'])} {'person' if len(bfs['revealed']) == 1 else 'people'} marked interested so far.")
         with st.container(border=True):
             pu.section("Second opinion", "Before a final call, HireMate argues the other side, from the data only.")
             jid = job_pick("soj")
