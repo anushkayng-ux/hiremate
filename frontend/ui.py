@@ -160,6 +160,15 @@ section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a span{font-size:.
 .hero .hp{padding:.4rem .75rem;margin:.3rem 0;border-radius:10px;font-size:.92rem}
 .resume{padding:.6rem .8rem;font-size:.82rem;line-height:1.5}
 [data-testid="stExpander"] details{border-radius:12px}
+[data-testid="stChatMessage"]{background:#fff;border:1px solid #E5E7EF;border-radius:14px;padding:.6rem .85rem;margin-bottom:.4rem}
+[data-testid="stChatMessage"] ul{margin:.2rem 0 .2rem 1rem;padding:0}
+[data-testid="stChatMessage"] li{margin:.12rem 0}
+[data-testid="stChatMessage"] button[data-testid^="stBaseButton"]{font-size:.82rem;min-height:1.9rem;border-radius:999px!important}
+[data-testid="stDataFrame"]{border-radius:10px;overflow:hidden;border:1px solid #E5E7EF}
+.prow + div,.prow{line-height:1.35}
+[data-testid="stMetric"]{padding:.3rem 0}
+[data-testid="stMarkdownContainer"] p{padding-bottom:.12rem}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:8px}
 </style>
 """
 

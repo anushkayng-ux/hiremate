@@ -9,8 +9,8 @@ import streamlit as st
 import api
 import ui
 
-STARTERS = ["List all candidates with their skills and gaps", "Who matches Store Manager?",
-            "Which candidates are awaiting interviews?", "Write a JD for a cashier in Ghaziabad with 1+ years"]
+STARTERS = ["What should I do today?", "Who should I hire first and why?", "Who is waiting too long?",
+            "List all candidates with their skills and gaps", "Write a JD for a cashier in Ghaziabad with 1+ years"]
 
 
 def _session():
@@ -57,6 +57,8 @@ def _render(m: dict, last: bool, i: int, pfx: str):
         if m.get("badge"):
             ui.html_block(f'<span class="badge">{ui.esc(m["badge"])}</span>')
         st.markdown(m["reply"].replace("\n", "  \n") if "|" not in m["reply"] else m["reply"])
+        if m.get("bullets"):
+            st.markdown("\n".join(f"- {b}" for b in m["bullets"]))
         t = m.get("table")
         if t and t.get("rows"):
             st.dataframe(pd.DataFrame(t["rows"], columns=t["head"]).astype(str), hide_index=True,
