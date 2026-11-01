@@ -169,6 +169,12 @@ section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a span{font-size:.
 [data-testid="stMetric"]{padding:.3rem 0}
 [data-testid="stMarkdownContainer"] p{padding-bottom:.12rem}
 ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:8px}
+
+[data-testid="stChatMessage"] h3{font-size:.95rem;font-weight:700;margin:.65rem 0 .2rem;color:#1d4ed8;letter-spacing:.01em}
+[data-testid="stChatMessage"] p{margin:0 0 .45rem;line-height:1.5}
+[data-testid="stChatMessage"] ul,[data-testid="stChatMessage"] ol{margin:.1rem 0 .55rem;padding-left:1.2rem}
+[data-testid="stChatMessage"] li{margin:.15rem 0;line-height:1.45}
+[data-testid="stChatMessage"] strong{color:#0f172a}
 </style>
 """
 

@@ -63,6 +63,13 @@ def new_chat() -> None:
     st.session_state.pop("chat_sid", None)
 
 
+def _md(t: str) -> str:
+    """Keep real markdown (headings, bullets, tables) as written; only plain text gets line breaks."""
+    if any(x in t for x in ("\n- ", "\n* ", "\n#", "###", "**", "|", "\n1. ")):
+        return t
+    return t.replace("\n", "  \n")
+
+
 def _render(m: dict, last: bool, i: int, pfx: str):
     if m["role"] == "user":
         with st.chat_message("user", avatar=":material/person:"):
@@ -75,7 +82,7 @@ def _render(m: dict, last: bool, i: int, pfx: str):
     with st.chat_message("assistant", avatar=":material/auto_awesome:"):
         if m.get("badge"):
             ui.html_block(f'<span class="badge">{ui.esc(m["badge"])}</span>')
-        st.markdown(m["reply"].replace("\n", "  \n") if "|" not in m["reply"] else m["reply"])
+        st.markdown(_md(m["reply"]))
         if m.get("bullets"):
             st.markdown("\n".join(f"- {b}" for b in m["bullets"]))
         t = m.get("table")
