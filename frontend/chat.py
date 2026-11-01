@@ -147,9 +147,9 @@ def open_window(prefill: str | None = None) -> None:
     ctx = st.session_state.get("view_ctx")
     if ctx:
         st.session_state.chat_ctx = dict(ctx)
-    if "chat_back" not in st.session_state or st.session_state.get("_nav_key") not in (None, "asha"):
+    if "chat_back" not in st.session_state or st.session_state.get("_nav_key") not in (None, "assistant"):
         st.session_state.chat_back = st.session_state.get("_nav_key") or "dashboard"
-    ui.go("asha")
+    ui.go("assistant")
 
 
 def scroll_to_end() -> None:

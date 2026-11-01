@@ -131,8 +131,11 @@ def public_jobs() -> list[dict]:
     return _session().get(API_URL + "/portal/jobs/public", timeout=15).json()
 
 
-def portal_signup(name: str, email: str, password: str, job_id: int | None, f) -> dict:
-    data = {"name": name, "email": email, "password": password}
+def portal_signup(name: str, email: str, password: str, job_id: int | None, f, consent: bool = False,
+                  source: str | None = None) -> dict:
+    data = {"name": name, "email": email, "password": password, "consent": str(bool(consent)).lower()}
+    if source:
+        data["source"] = source
     if job_id:
         data["job_id"] = str(job_id)
     r = _session().post(API_URL + "/portal/signup", data=data, files={"file": (f.name, f.getvalue())}, timeout=120)
