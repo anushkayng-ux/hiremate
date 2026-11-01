@@ -14,8 +14,8 @@ if st.button("← Settings", type="tertiary"):
     ui.go("settings")
 ui.header("Team", sub="Who can sign in to HireMate, and what each role can do.")
 
-ROLES = {"Admin": ("#1D4ED8", "Everything a Recruiter can do, plus: add or edit team members, change settings and AI, reset demo data."),
-         "Recruiter": ("#15803D", "Jobs, CVs, matching, shortlist, book interviews, drafts and sends emails, Ask AI, reports."),
+ROLES = {"Admin": ("#0B6149", "Everything a Recruiter can do, plus: add or edit team members, change settings and AI, reset demo data."),
+         "Recruiter": ("#0E7A5C", "Jobs, CVs, matching, shortlist, book interviews, drafts and sends emails, Ask AI, reports."),
          "Interviewer": ("#B45309", "Sees only the interviews and candidates given to them. Adds their own feedback and scores.")}
 with st.container(border=True):
     st.markdown("**Roles**")
@@ -27,7 +27,7 @@ with st.container(border=True):
 users = ui.safe(api.get, "/settings/users") or []
 active = [x for x in users if x.get("active", 1)]
 with st.container(border=True):
-    st.markdown(f"**People** &nbsp;<span class='pill' style='background:#2563EB;color:#fff'>{len(active)} active</span>",
+    st.markdown(f"**People** &nbsp;<span class='pill' style='background:#0E7A5C;color:#fff'>{len(active)} active</span>",
                 unsafe_allow_html=True)
     for x in users:
         on = bool(x.get("active", 1))

@@ -12,7 +12,7 @@ with top:
     st.markdown('<p class="eyb">Assistant</p>', unsafe_allow_html=True)
     st.markdown("## Ask AI")
 if a.button("Back", icon=":material/arrow_back:", width="stretch"):
-    ui.go(back if back in ui.PAGES and back != "asha" else "dashboard")
+    ui.go(back if back in ui.PAGES and back != "assistant" else "dashboard")
 if b.button("New chat", icon=":material/add:", width="stretch"):
     chat.new_chat()
     st.session_state.pop("chat_ctx", None)

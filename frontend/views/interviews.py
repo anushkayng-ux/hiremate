@@ -19,7 +19,7 @@ for tab, when in ((tab1, "upcoming"), (tab2, "past")):
                 y.markdown(f'{ui.fmt_date(iv["date"])}, {ui.fmt_time(iv["time"])}<br><span class="muted small">'
                            f'{ui.esc(iv["mode"])} · {ui.esc(iv["interviewer"])}</span>', unsafe_allow_html=True)
                 label = "Feedback in" if iv["has_feedback"] else iv["status"] if iv["status"] != "Scheduled" or when == "upcoming" else "Feedback due"
-                z.markdown(f'<span class="pill" style="background:{"#DCFCE7" if iv["has_feedback"] else "#FEF3C7"}">{label}</span>',
+                z.markdown(f'<span class="pill" style="background:{"#DDF1E8" if iv["has_feedback"] else "#FEF3C7"}">{label}</span>',
                            unsafe_allow_html=True)
                 if w.button("View", key=f"iv{iv['id']}", width="stretch"):
                     ui.open_candidate(iv["candidate_id"], iv["job_id"])

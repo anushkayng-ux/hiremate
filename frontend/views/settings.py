@@ -26,8 +26,8 @@ with st.container(border=True):
     top_l, top_r = st.columns([3, 1.2], vertical_alignment="center")
     top_l.markdown("**AI model**")
     ok = s["llm"]["connected"]
-    top_r.markdown(f'<span class="pill" style="background:{"#DCFCE7" if ok else "#FEF3C7"};color:'
-                   f'{"#1D4ED8" if ok else "#92400E"}">{"AI on" if ok else "Using templates"}</span>',
+    top_r.markdown(f'<span class="pill" style="background:{"#DDF1E8" if ok else "#FEF3C7"};color:'
+                   f'{"#0B6149" if ok else "#92400E"}">{"AI on" if ok else "Using templates"}</span>',
                    unsafe_allow_html=True)
     st.caption(f"Now: {s['llm']['provider']}. Scores never use AI. AI only writes summaries, questions, emails, JDs "
                "and answers. Without a key everything still works with templates.")
@@ -139,6 +139,21 @@ with right:
         if st.button("Open knowledge store"):
             ui.go("knowledge")
     if u["role"] == "Admin":
+        with st.container(border=True):
+            st.markdown("**Privacy and data retention**")
+            days = st.number_input("Keep CVs of people never hired for (days)", 30, 1095, 180, 30)
+            pv = ui.safe(api.get, "/x/privacy", days=int(days)) or {}
+            ui.html_block(f'<span class="small">{pv.get("total", 0)} people stored · {pv.get("with_consent", 0)} gave consent '
+                          f'· {pv.get("erased", 0)} erased on request<br><b>{len(pv.get("due", []))}</b> older than '
+                          f'{int(days)} days with no activity</span>')
+            if pv.get("due"):
+                st.caption(", ".join(f'{d["name"]} (last {d["last_activity"]})' for d in pv["due"][:6]))
+                if st.button(f"Erase {len(pv['due'])} old profile(s)"):
+                    r = ui.safe(api.post, f"/x/privacy/purge?days={int(days)}")
+                    ui.toast_next(f"Erased {r['erased'] if r else 0} profile(s)")
+                    st.rerun()
+            st.caption("India's DPDP Act 2023: collect with consent, keep only as long as needed, erase on request. "
+                       "Candidates can also erase their own data from the portal.")
         with st.container(border=True):
             st.markdown("**Demo data**")
             if st.button("Reset to the sample data"):

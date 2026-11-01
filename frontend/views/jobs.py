@@ -81,7 +81,7 @@ for j in jobs:
         x.markdown(f'<span class="pname">{ui.esc(j["title"])}</span><br><span class="muted small">{ui.esc(j["location"])} · '
                    f'{j["min_years"]:g}+ years · {j["status"]}</span>', unsafe_allow_html=True)
         sc = j["stage_counts"]
-        y.markdown(" ".join(f'<span class="pill" style="background:#F1F5F9;color:#334155">{ui.LABEL[s]} '
+        y.markdown(" ".join(f'<span class="pill" style="background:#EEEDF3;color:#3D3954">{ui.LABEL[s]} '
                             f'<b>{sc.get(s, 0)}</b></span>' for s in ui.FLOW), unsafe_allow_html=True)
         if z.button("Open", key=f"j{j['id']}", type="primary", width="stretch"):
             ui.open_job(j["id"])

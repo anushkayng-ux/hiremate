@@ -38,22 +38,26 @@ for col, (label, v) in zip(st.columns(4), [("Open jobs", k["open_roles"]), ("New
     with col.container(border=True):
         ui.html_block(f'<div class="kpi">{v}</div><div class="kpil">{label}</div>')
 
+from plus import plus_ui  # noqa: E402  (HireMate Plus)
+
+plus_ui.briefing_card()
+
 # what each to-do is, in plain words, and its button
 TODO = {"Screen": ("Review CV", "#B45309", "New applicant. Read the CV and decide."),
-        "Schedule": ("Book interview", "#1D4ED8", "Shortlisted. Book an interview."),
+        "Schedule": ("Book interview", "#0B6149", "Shortlisted. Book an interview."),
         "Feedback": ("Add feedback", "#7E22CE", "Interview done. Add your feedback."),
-        "Decide": ("Decide", "#15803D", "Feedback is in. Hire or not?")}
+        "Decide": ("Decide", "#0E7A5C", "Feedback is in. Hire or not?")}
 TAB = {"Screen": "Overview", "Schedule": "Interview", "Feedback": "Interview", "Decide": "Overview"}
 
 left, right = st.columns([1.6, 1], gap="medium")
 with left:
     with st.container(border=True):
-        st.markdown(f"### To do today &nbsp;<span class='pill' style='background:#2563EB;color:#fff'>{len(d['needs'])}</span>",
+        st.markdown(f"### To do today &nbsp;<span class='pill' style='background:#0E7A5C;color:#fff'>{len(d['needs'])}</span>",
                     unsafe_allow_html=True)
         if not d["needs"]:
             ui.html_block('<div class="okbox">All done. Nothing needs you right now.</div>')
         for i, n in enumerate(d["needs"]):
-            label, color, plain = TODO.get(n["kind"], ("Open", "#334155", n["text"]))
+            label, color, plain = TODO.get(n["kind"], ("Open", "#3D3954", n["text"]))
             who = f'{ui.name(n.get("name", ""), n["candidate_id"])} · {n.get("job", "")}' if n.get("name") else n["text"]
             a, b = st.columns([4, 1.3], vertical_alignment="center", gap="small")
             a.markdown(f'<div class="prow">{ui.avatar(n.get("name") or "?", size=38)}<div><b>{ui.esc(who)}</b><br><span class="muted small">{plain}</span></div></div>',
@@ -91,7 +95,7 @@ with left:
 with right:
     inbox = ui.safe(api.get, "/emails/inbox/list") or []
     with st.container(border=True):
-        st.markdown("### Replies from candidates" + (f" &nbsp;<span class='pill' style='background:#2563EB;color:#fff'>{len(inbox)}</span>"
+        st.markdown("### Replies from candidates" + (f" &nbsp;<span class='pill' style='background:#0E7A5C;color:#fff'>{len(inbox)}</span>"
                                                      if inbox else ""), unsafe_allow_html=True)
         if not inbox:
             st.markdown('<p class="muted small" style="margin:0">No new replies. When a candidate replies or confirms '
@@ -112,7 +116,7 @@ with right:
                 ui.open_candidate(m["candidate_id"], m["job_id"])
     drafts = ui.safe(api.get, "/emails", status="Draft") or []
     with st.container(border=True):
-        st.markdown("### Emails ready to send" + (f" &nbsp;<span class='pill' style='background:#2563EB;color:#fff'>{len(drafts)}</span>"
+        st.markdown("### Emails ready to send" + (f" &nbsp;<span class='pill' style='background:#0E7A5C;color:#fff'>{len(drafts)}</span>"
                                                   if drafts else ""), unsafe_allow_html=True)
         if not drafts:
             st.markdown('<p class="muted small" style="margin:0">None. AI writes a draft each time you book an '

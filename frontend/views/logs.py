@@ -12,7 +12,7 @@ if u["role"] != "Admin":
 
 PAGE = 25
 ICON = {"Signed in": "🟢", "Sign-in failed": "🔴", "User added": "👤", "User updated": "👤", "Log exported": "⬇️"}
-TONE = {"Sign-in failed": ("#B91C1C", "#FEE2E2"), "Signed in": ("#15803D", "#DCFCE7")}
+TONE = {"Sign-in failed": ("#B42318", "#FDE6E3"), "Signed in": ("#0E7A5C", "#DDF1E8")}
 
 with st.container(border=True):
     c1, c2, c3, c4 = st.columns([2.2, 1.5, 1.5, 1.2])
@@ -55,7 +55,7 @@ with st.container(border=True):
     if not d["rows"]:
         ui.html_block('<div class="emptycol">No log entries match. Clear the filters.</div>')
     for r in d["rows"]:
-        fg, bg = TONE.get(r["action"], ("#334155", "#F1F5F9"))
+        fg, bg = TONE.get(r["action"], ("#3D3954", "#EEEDF3"))
         ui.html_block(
             f'<div class="prow" style="padding:.3rem 0;border-bottom:1px solid #EEF2F7">'
             f'{ui.avatar(r["by_name"] or "?", size=30)}<div style="flex:1;min-width:0">'

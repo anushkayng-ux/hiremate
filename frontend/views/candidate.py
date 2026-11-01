@@ -4,6 +4,7 @@ import streamlit as st
 
 import api
 import ui
+import widgets
 
 cid = st.session_state.get("cand_id")
 if not cid:
@@ -64,16 +65,32 @@ with st.container(border=True):
                 st.session_state.cand_job = pick
                 st.rerun()
 
-TABS = ["Overview", "Interview", "Emails", "Notes"]
+TABS = ["Overview", "Insights", "Interview", "Emails", "Offer", "Notes"]  # Insights = HireMate Plus
 want = st.session_state.pop("cand_tab", None)
 if want in TABS:
     st.session_state["ctab"] = want
 tab = st.segmented_control("Section", TABS, default="Overview", key="ctab", label_visibility="collapsed") or "Overview"
 
+# ------------------------------------------------------------ HireMate Plus
+from plus import plus_ui  # noqa: E402
+
+if plus_ui.hidden(cid):
+    a_, b_ = st.columns([4, 1.4], vertical_alignment="center")
+    a_.markdown('<div class="note">Blind first look is on: name and contact details are hidden. Judge the skills and '
+                'results first.</div>', unsafe_allow_html=True)
+    if b_.button("I'm interested: show details", type="primary", width="stretch"):
+        api.post(f"/plus/reveal/{cid}")
+        plus_ui._blind_state.clear()
+        st.rerun()
+if tab == "Insights":
+    plus_ui.candidate_insights(cid, jid, nm, rec)
+
 # ------------------------------------------------------------ overview
 if tab == "Overview":
     left, right = st.columns([1.15, 1], gap="medium")
     with left:
+        if m["stage"]:
+            widgets.screening_and_source(m["application_id"], rec)
         flags = api.get(f"/smart/flags/{cid}", job_id=jid)
         with st.container(border=True):
             st.markdown("### Things to check" + (f" &nbsp;<span class='pill' style='background:#FFEDD5;color:#9A3412'>"
@@ -84,7 +101,7 @@ if tab == "Overview":
             st.markdown("### Why this match")
             must = [r for r in m["rows"] if r["must"]] or m["rows"]
             got = [r for r in must if r["status"] != "Missing"]
-            ui.html_block(f'<p class="small" style="color:{"#15803D" if len(got) == len(must) else "#B45309"};font-weight:600;margin:0">'
+            ui.html_block(f'<p class="small" style="color:{"#0E7A5C" if len(got) == len(must) else "#B45309"};font-weight:600;margin:0">'
                           f'Has {len(got)} of {len(must)} must-have skills</p>')
             for r in must:
                 ok = r["status"] != "Missing"
@@ -166,6 +183,11 @@ if tab == "Interview":
                 ui.html_block(f'<div class="{"okbox" if resp == "Confirmed" else "flag" if resp else "flag info"}" style="margin-top:.3rem">'
                               + (f'Candidate: {ui.esc(resp)}' + (f' · "{ui.esc(cur.get("candidate_note"))}"' if cur.get("candidate_note") else "")
                                  if resp else "Candidate has not answered yet. They confirm from their portal.") + '</div>')
+                if cur["status"] == "Scheduled":
+                    st.download_button("Add to calendar (.ics)", data=api.get(f"/x/interviews/{cur['id']}/ics"),
+                                       file_name=f"Interview - {c['name']}.ics", mime="text/calendar",
+                                       icon=":material/calendar_add_on:", key=f"ics{cur['id']}",
+                                       help="Opens in Outlook, Google Calendar or your phone calendar, with a 1-hour reminder.")
             if rec and not (cur and cur["status"] == "Scheduled"):
                 st.markdown('<p class="small" style="margin:.3rem 0 .2rem"><b>Free times</b> · one click books it and '
                             'writes the invite email (you press Send)</p>', unsafe_allow_html=True)
@@ -291,13 +313,23 @@ if tab == "Emails":
     for e in th:
         mine = e["direction"] == "out"
         when = ui.fmt_ts(e.get("sent_at") or e["created_at"])
-        style = ("background:#FFFFFF;border:1px solid #E2E8F0;margin-right:12%" if mine
-                 else "background:#EFF6FF;border:1px solid #BFDBFE;margin-left:12%")
+        style = ("background:#FFFFFF;border:1px solid #E3E2EA;margin-right:12%" if mine
+                 else "background:#E6F4EE;border:1px solid #B8DFCF;margin-left:12%")
         who = f'You sent · {ui.esc(e["type_label"])}' if mine else f'{ui.esc(c["name"])} replied'
         ui.html_block(f'<div style="{style};border-radius:12px;padding:.8rem 1rem;margin:.35rem 0">'
-                      f'<span class="eyb" style="color:{"#64748B" if mine else "#1D4ED8"}">{who} · {when}</span><br>'
+                      f'<span class="eyb" style="color:{"#6B6880" if mine else "#0B6149"}">{who} · {when}</span><br>'
                       f'<b>{ui.esc(e["subject"])}</b><div class="small" style="white-space:pre-wrap;margin-top:.3rem">'
                       f'{ui.esc(e["body"])}</div></div>')
+        if mine and rec:
+            with st.popover("Also send on WhatsApp", icon=":material/chat:"):
+                wa = ui.safe(api.get, f"/x/emails/{e['id']}/whatsapp")
+                if wa:
+                    st.text_area("Short message", wa["text"], height=130, key=f"wa{e['id']}")
+                    if wa["link"]:
+                        st.link_button("Open WhatsApp", wa["link"], type="primary", width="stretch")
+                        st.caption("WhatsApp opens with the message ready. You press send there.")
+                    else:
+                        st.caption("No phone number in this CV. Copy the text and send it from your phone.")
         if not mine and rec:
             if not e.get("read_at"):
                 api.post(f"/emails/{e['id']}/read")
@@ -306,6 +338,10 @@ if tab == "Emails":
                     ui.safe(api.post, f"/emails/{e['id']}/ai-reply")
                 ui.toast_next("Reply drafted above. Check it and press Send.")
                 st.rerun()
+
+# ------------------------------------------------------------ offer
+if tab == "Offer":
+    widgets.offer_panel(m, c, jid, rec)
 
 # ------------------------------------------------------------ notes
 if tab == "Notes":
@@ -320,8 +356,16 @@ if tab == "Notes":
     st.markdown("**Activity**")
     for l in api.get(f"/candidates/{cid}/activity"):
         ui.html_block(f'<p class="small muted" style="margin:.1rem 0">{ui.fmt_ts(l["created_at"])} · '
-                      f'<b style="color:#0F172A">{ui.esc(l["action"])}</b> {ui.esc(l["detail"] or "")}'
+                      f'<b style="color:#1E1B33">{ui.esc(l["action"])}</b> {ui.esc(l["detail"] or "")}'
                       f'{" · " + ui.esc(l["job_title"]) if l["job_title"] else ""} · {ui.esc(l["by_name"])}</p>')
+    if st.session_state.user["role"] == "Admin":
+        with st.expander("Erase personal data (privacy request)"):
+            st.caption("Removes the CV, contact details, notes, answers and message text. Report numbers stay, "
+                       "with the name replaced. Use this when the person asks you to delete their data (DPDP Act 2023).")
+            if st.button("Erase this person's data"):
+                ui.safe(api.post, f"/x/candidates/{cid}/erase")
+                ui.toast_next("Personal data erased")
+                ui.go("candidates")
     if rec:
         with st.expander("Delete candidate"):
             st.warning("This removes the candidate from every job.")

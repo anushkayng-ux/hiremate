@@ -48,7 +48,7 @@ ranked = ui.safe(api.get, f"/match/job/{jid}") or []
 nx = api.get(f"/smart/next/{jid}")
 with st.container(key="nextbox"):
     a, b = st.columns([4, 1.4], vertical_alignment="center")
-    a.markdown(f'<div class="nextbar"><span class="eyb" style="color:#2563EB">Do this next</span><br>'
+    a.markdown(f'<div class="nextbar"><span class="eyb" style="color:#0E7A5C">Do this next</span><br>'
                f'<b style="font-size:1.05rem">{ui.esc(nx["text"])}</b></div>', unsafe_allow_html=True)
     if nx.get("button") and b.button(nx["button"], type="primary", width="stretch", key="nextgo", disabled=not rec):
         if nx["kind"] == "review":
@@ -59,13 +59,23 @@ with st.container(key="nextbox"):
             st.session_state["cand_tab"] = "Interview" if nx["kind"] == "book" else "Overview"
             ui.open_candidate(nx["candidate_id"], jid)
 n_rules = len(api.get("/criteria", job_id=jid, scope="job"))
-VIEWS = ["Candidates", "Job details", f"Your rules ({n_rules})", "Find more people"]
+n_q = len(ui.safe(api.get, f"/x/jobs/{jid}/questions") or [])
+VIEWS = ["Candidates", "Board", "Job details", f"Screening questions ({n_q})", f"Your rules ({n_rules})", "Find more people"]
 view = st.segmented_control("View", VIEWS, default=VIEWS[0], key=f"jobview{jid}", label_visibility="collapsed") or VIEWS[0]
 if view.startswith("Your rules"):
     view = "Your rules"
+if view.startswith("Screening"):
+    view = "Screening"
+
+if view == "Board":
+    widgets.board(ranked, jid, rec)
+
+if view == "Screening":
+    widgets.questions_editor(jid, rec)
 
 # ------------------------------------------------------------ candidates
 if view == "Candidates":
+    ko = {int(k): v for k, v in (ui.safe(api.get, f"/x/jobs/{jid}/knockouts") or {}).items()}
     counts = {s: sum(r["stage"] == s for r in ranked) for s in ui.STAGES}
     opts = ["All"] + ui.FLOW + ["Rejected"]
     fmt = lambda s: (f"All  {len([r for r in ranked if r['stage'] != 'Rejected'])}" if s == "All"
@@ -84,8 +94,10 @@ if view == "Candidates":
             x, y, z = st.columns([5, 0.9, 1.3], vertical_alignment="center")
             sub = " · ".join(v for v in [r.get("headline"), r.get("location"), f'{r["years"]:g} yrs'] if v)
             rule = ("" if not r.get("criteria") or r["meets_criteria"]
-                    else ' <span class="pill" style="background:#FEE2E2;color:#B91C1C">Misses your rule</span>')
-            x.markdown(f'<div class="prow"><b style="color:#94A3B8;width:1rem">{i}</b>{ui.avatar(nm, r["score"])}<div>'
+                    else ' <span class="pill" style="background:#FDE6E3;color:#B42318">Misses your rule</span>')
+            if r["candidate_id"] in ko:
+                rule += ' <span class="pill" style="background:#FFE8D6;color:#9A3412">Screening answer to check</span>'
+            x.markdown(f'<div class="prow"><b style="color:#9A97AB;width:1rem">{i}</b>{ui.avatar(nm, r["score"])}<div>'
                        f'<span class="pname">{ui.esc(nm)}</span> &nbsp;{ui.score_chip(r["score"])} {ui.stage_pill(r["stage"])}'
                        f'{rule}<br><span class="muted small">{ui.esc(sub)}</span></div></div>', unsafe_allow_html=True)
             if y.button("View", key=f"v{r['candidate_id']}", width="stretch"):
@@ -98,6 +110,9 @@ if view == "Candidates":
         st.download_button(f"Share shortlist ({len(short)}) with the store manager", data=widgets.shortlist_html(job, short),
                            file_name=f"Shortlist - {job['title'].split(' /')[0]}.html", mime="text/html",
                            icon=":material/share:", help="A one-page summary. Open it and print to PDF, or send it as it is.")
+    st.download_button("Download ranked list (Excel / CSV)", data=api.get(f"/x/jobs/{jid}/export.csv"),
+                       file_name=f"Ranked - {job['title'].split(' /')[0]}.csv", mime="text/csv",
+                       icon=":material/table_view:")
     if len(rows) >= 2:
         with st.expander("Compare people side by side"):
             pk = st.multiselect("Pick 2 or 3", [r["candidate_id"] for r in rows], max_selections=3,
