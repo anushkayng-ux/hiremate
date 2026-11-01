@@ -134,15 +134,20 @@ def stream_chat(data, files=None):
             d = r.text
         raise ApiError(r.status_code, str(d))
 
-    try:
-        for line in r.iter_lines(decode_unicode=True):
-            if line:
-                ev = _json.loads(line)
-                if "delta" in ev:
-                    yield "delta", ev["delta"]
-                elif "final" in ev:
-                    yield "final", ev["final"]
+    event = ""
+    try:   # Server-Sent Events: "event: x" then "data: {json}" then a blank line
+        for line in r.iter_lines(chunk_size=1, decode_unicode=True):
+            if line.startswith("event:"):
+                event = line[6:].strip()
+            elif line.startswith("data:"):
+                payload = _json.loads(line[5:].strip())
+                if event == "delta":
+                    yield "delta", payload
+                elif event == "final":
+                    yield "final", payload
                     return
+                elif event == "error":
+                    break
     except (requests.RequestException, ValueError):
         pass
     # the stream broke before a final answer: ask the normal way
