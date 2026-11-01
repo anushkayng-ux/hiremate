@@ -300,8 +300,11 @@ async def chat_stream(session_id: str = Form(...), message: str = Form(""), job_
     atts = await _atts(files_, u)
 
     def gen():
-        for ev in assistant.chat_stream(session_id, u, message, atts, {"job_id": job_id, "candidate_id": candidate_id}):
-            yield _json.dumps(ev) + "\n"
+        try:
+            for ev in assistant.chat_stream(session_id, u, message, atts, {"job_id": job_id, "candidate_id": candidate_id}):
+                yield _json.dumps(ev, default=str) + "\n"
+        except Exception as e:   # never cut the stream mid-way: tell the page to use the normal answer
+            yield _json.dumps({"error": str(e)[:200]}) + "\n"
     return StreamingResponse(gen(), media_type="application/x-ndjson", headers={"X-Accel-Buffering": "no"})
 
 
