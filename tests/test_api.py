@@ -432,3 +432,27 @@ def test_logs_admin_only_and_settings_roles(c):
         rc.headers["Authorization"] = "Bearer " + t
         assert rc.get("/settings/logs").status_code == 403
         assert rc.get("/settings/ai").status_code == 200
+
+
+def test_streaming_chat(c, monkeypatch):
+    import json as _json
+    from backend.app.adapters import llm as llm_mod
+
+    class Fake:
+        name = "fake"
+        def generate(self, prompt, system="", max_tokens=0):
+            return "Priya leads. [1]"
+        def stream(self, prompt, system="", max_tokens=0):
+            yield "Priya "
+            yield "leads. [1]"
+    monkeypatch.setattr(llm_mod, "get_llm", lambda: Fake())
+    # quick data answers arrive as one final message
+    r = c.post("/assistant/chat/stream", data={"session_id": "st1", "message": "Who should I hire first and why?"})
+    evs = [_json.loads(x) for x in r.text.splitlines() if x]
+    assert evs[-1]["final"]["table"] and not any("delta" in e for e in evs)
+    # free-form questions stream piece by piece, then save the full answer
+    r = c.post("/assistant/chat/stream", data={"session_id": "st2", "message": "How is morale in the stores?"})
+    evs = [_json.loads(x) for x in r.text.splitlines() if x]
+    assert [e["delta"] for e in evs if "delta" in e] == ["Priya ", "leads. [1]"]
+    assert evs[-1]["final"]["reply"] == "Priya leads. [1]"
+    assert c.get("/assistant/history/st2").json()[-1]["reply"] == "Priya leads. [1]"
