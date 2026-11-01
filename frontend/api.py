@@ -133,10 +133,22 @@ def stream_chat(data, files=None):
         except ValueError:
             d = r.text
         raise ApiError(r.status_code, str(d))
-    for line in r.iter_lines(decode_unicode=True):
-        if line:
-            ev = _json.loads(line)
-            if "delta" in ev:
-                yield "delta", ev["delta"]
-            elif "final" in ev:
-                yield "final", ev["final"]
+
+    try:
+        for line in r.iter_lines(decode_unicode=True):
+            if line:
+                ev = _json.loads(line)
+                if "delta" in ev:
+                    yield "delta", ev["delta"]
+                elif "final" in ev:
+                    yield "final", ev["final"]
+                    return
+    except (requests.RequestException, ValueError):
+        pass
+    # the stream broke before a final answer: ask the normal way
+    try:
+        r2 = _session().post(API_URL + "/assistant/chat", headers=_headers(), data=data, files=files, timeout=120)
+        r2.raise_for_status()
+        yield "final", r2.json()
+    except requests.RequestException:
+        raise ApiError(0, "The AI could not answer just now. Please try again.") from None
