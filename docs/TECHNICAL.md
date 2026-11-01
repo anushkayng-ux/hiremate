@@ -60,7 +60,7 @@ Experience = min(100, CV years / years asked × 100)
 
 ML outputs are shown as **hints**. Recruiters decide.
 
-## 6. Asha (assistant)
+## 6. Ask AI (assistant)
 
 1. **Intent router (rules)** handles actions and database questions, so it works with no LLM:
    create job (from attached JD or written JD), add candidates (from attached CVs, with duplicate check),

@@ -1,8 +1,8 @@
 # HireMate — Scope Document
 
-**Project:** AI-powered recruiter assistant ("HireMate") with an in-app assistant called **Asha**
-**Prepared for:** Vishal Mega Mart · HR & Recruitment team
-**Prepared by:** Muskan Sethi
+**Project:** AI-powered recruiter assistant ("HireMate") with an in-app assistant called **Ask AI**
+**Prepared for:** HR & Recruitment team
+**Prepared by:** Project team
 **Date:** 31 October 2026
 **Status:** Clickable mockup done · Python build next
 
@@ -18,11 +18,11 @@
 
 | # | Requirement | Where it lives |
 |---|---|---|
-| R1 | Upload and analyse CVs and JDs | Add candidates, Create job, Knowledge, Asha (attach files) |
+| R1 | Upload and analyse CVs and JDs | Add candidates, Create job, Knowledge, Ask AI (attach files) |
 | R2 | Match and rank candidates, show skills and gaps | Job pipeline, Ranked list, Screening & Matching, candidate Profile |
 | R3 | Candidate summaries and interview questions | Profile (AI summary), Interview tab |
-| R4 | Draft recruitment emails | Emails tab, Asha |
-| R5 | Answer recruitment questions from the data | Asha (database + documents) |
+| R4 | Draft recruitment emails | Emails tab, Ask AI |
+| R5 | Answer recruitment questions from the data | Ask AI (database + documents) |
 
 ## 3. Users and roles
 
@@ -78,7 +78,7 @@
 - Uses candidate, job, interview slot and HR policy. English or Hindi.
 - Recruiter edits and **approves** every email; approval is logged.
 
-### H. Asha (AI assistant)
+### H. Ask AI (AI assistant)
 - Opens from the header on every page (Ctrl + J). Accepts attached JD / CV / policy files.
 - Can: create jobs, add candidates, rank "who matches this JD", move stages, schedule interviews, draft and approve emails, add feedback and notes, compare, summarize, answer policy questions.
 - Writes a JD from a short description → **downloadable .docx** → "ok, create the job".
@@ -170,13 +170,13 @@
 |---|---|
 | 1 | Data model, seed data, parsing (CV/JD), skills + proof, FastAPI skeleton, login |
 | 2 | Matching + scoring, jobs, candidates, pipeline, ranked list, compare |
-| 3 | Profile, interviews, emails, knowledge store, Asha (actions + RAG) |
+| 3 | Profile, interviews, emails, knowledge store, Ask AI (actions + RAG) |
 | 4 | Analytics, settings, evaluation, deploy to Hugging Face, README, demo rehearsal |
 
 ## 14. Acceptance criteria
 
 - A recruiter can complete the full flow: create job → upload CVs → see ranked list with proof → shortlist → schedule → questions → feedback → select → email approved → dashboard updates.
-- Asha can do every action above from chat, including creating a job from an attached JD and adding a candidate from an attached CV.
+- Ask AI can do every action above from chat, including creating a job from an attached JD and adding a candidate from an attached CV.
 - Every score shows its breakdown; every AI answer shows its source or says "not in data".
 - No button, form or chat action is a placeholder.
 
@@ -192,10 +192,10 @@
 ## 16. Demo script (5 minutes)
 
 1. Sign in → Dashboard "Needs you".
-2. Ask Asha: attach a JD → "Who matches this?" → "Ok, create the job".
+2. Ask Ask AI: attach a JD → "Who matches this?" → "Ok, create the job".
 3. Attach a CV → "Add to <job>".
 4. Open top candidate → resume with highlights → AI summary.
 5. Shortlist → schedule interview → questions → feedback → select.
 6. Draft selection email → approve.
-7. Asha: "Which candidates are awaiting interviews?" and a policy question.
+7. Ask AI: "Which candidates are awaiting interviews?" and a policy question.
 8. Analytics → Settings (weights) → How matching works.
