@@ -833,6 +833,49 @@ def _hist_text(st: dict, n: int = 6) -> str:
     return "\n".join(out) or "none"
 
 
+NEXT_RULE = ("\nLAST LINE: write 'NEXT:' then 3 short, useful follow-up questions the recruiter may ask next, "
+             "separated by ' | '. Nothing after it.")
+
+
+def _split_next(full: str) -> tuple[str, list[str]]:
+    """Separate the AI's text from its 'NEXT: a | b | c' follow-up ideas."""
+    m = re.search(r"\n?\s*NEXT:\s*(.*)$", full or "", re.S)
+    if not m:
+        return (full or "").strip(), []
+    sug = [x.strip(" -*\"'") for x in re.split(r"\s*\|\s*|\n", m.group(1)) if x.strip(" -*\"'")]
+    return full[:m.start()].strip(), [x for x in sug if len(x) < 90][:3]
+
+
+def _wrap_prompt(out: dict, text: str, st: dict) -> str | None:
+    """Ask the AI to explain a ready data answer in friendly words (so every answer is AI-written)."""
+    if not llm.get_llm() or out.get("badge") not in ("Database", "Documents") or out.get("email") or out.get("doc") \
+            or out.get("awaiting_yes") or st.get("pending") or not out.get("reply"):
+        return None
+    data = out["reply"]
+    if out.get("bullets"):
+        data += "\n" + "\n".join(f"- {b}" for b in out["bullets"][:8])
+    tb = out.get("table")
+    if tb and tb.get("rows"):
+        data += "\nTable columns: " + ", ".join(tb["head"]) + "\n" + "\n".join(" | ".join(str(c) for c in r) for r in tb["rows"][:10])
+    return ("You are HireMate, a friendly recruiting assistant for the Vishal Mega Mart HR team. The system already looked up "
+            "the facts below from the database. Explain them like ChatGPT would: very simple words, warm and clear. "
+            "FORMAT (markdown): '**Answer:** one short sentence', then '### Why' with 2 to 4 bullets (bold the names), then "
+            "'### Next step' with one action. Use ONLY the facts in DATA; never invent names or numbers. A table is shown "
+            "separately, so do not repeat it. Under 120 words." + NEXT_RULE +
+            f"\n\nCONVERSATION SO FAR:\n{_hist_text(st, 4)}\n\nRECRUITER ASKED: {text}\n\nDATA:\n{data[:2500]}")
+
+
+def _apply_wrap(out: dict, ai_text: str) -> dict:
+    body, sug = _split_next(ai_text)
+    if not body:
+        return out
+    out = dict(out)
+    out.update(reply=body, bullets=None, badge="AI + Database")
+    if sug:
+        out["suggestions"] = sug
+    return out
+
+
 WRITE = re.compile(r"\b(write|draft|compose|rewrite|rephrase|reword|proofread|translate|improve|polish|paragraph|message|"
                    r"announcement|speech|post|caption|template|tips?|ideas?|advice)\b")
 DATA = re.compile(r"\b(candidates?|applicants?|jobs?|roles?|scores?|match(es|ed)?|interviews?|stages?|shortlist\w*|"
@@ -853,12 +896,15 @@ def _llm_answer(text: str, st: dict, ctx: dict) -> dict | None:
                   "RULES: This is a general task. Do NOT use any real candidate, employee or job names from anywhere; "
                   "use placeholders like [Name], [Store], [City], [Date] where a detail is needed. Never invent facts, "
                   "numbers or policies. No citations. No filler. Do not repeat the question. "
-                  "For writing tasks, give only the finished text (short, ready to use). For advice, use 3 to 6 short bullets.\n\n"
+                  "For writing tasks, give only the finished text (short, ready to use). For advice, use 3 to 6 short bullets." + NEXT_RULE + "\n\n"
                   f"CONVERSATION SO FAR:\n{_hist_text(st, 4)}\n\nRECRUITER NOW: {text}")
         if getattr(_MODE, "stream", False):
             return {"_stream": {"prompt": prompt, "src": [], "ctx": dict(ctx), "badge": "AI writing"}}
         out = llm.generate(prompt, max_tokens=700)
-        return R(out, badge="AI writing", suggestions=default_suggestions(ctx)) if out else None
+        if not out:
+            return None
+        body, sug = _split_next(out)
+        return R(body, badge="AI writing", suggestions=sug or default_suggestions(ctx))
     hits = knowledge.retrieve(text, k=3)
     docs = "\n".join(f"[{i + 1}] {h['meta']['title']}: {h['text']}" for i, h in enumerate(hits))
     prompt = ("You are HireMate, a sharp, friendly recruiting assistant for the Vishal Mega Mart HR team. Talk like ChatGPT: "
@@ -870,7 +916,7 @@ def _llm_answer(text: str, st: dict, ctx: dict) -> dict | None:
               "FORMAT (markdown): for questions, use '**Answer:** one short sentence', then '### Why' with 2 to 4 bullets (bold the names), "
               "then '### Next step' with one action. For writing tasks (paragraph, summary, message) just write the text, no headings. "
               "Use a markdown table only when comparing 2 or more people. Keep it under 150 words. Cite documents like [1]. "
-              "If the data really has no answer, say 'That is not in the data.' and list what you can answer, as bullets."
+              "If the data really has no answer, say 'That is not in the data.' and list what you can answer, as bullets." + NEXT_RULE +
               f"\n\nCONVERSATION SO FAR:\n{_hist_text(st)}\n\nDATABASE:\n{data_snapshot()}\n\nDOCUMENTS:\n{docs or 'none'}"
               f"\n\nRECRUITER NOW: {text}")
     src = [{"n": i + 1, "title": h["meta"]["title"], "type": h["meta"]["type"], "key": h["meta"]["doc_key"]}
@@ -879,7 +925,8 @@ def _llm_answer(text: str, st: dict, ctx: dict) -> dict | None:
         return {"_stream": {"prompt": prompt, "src": src, "ctx": dict(ctx)}}
     out = llm.generate(prompt, max_tokens=700)
     if out:
-        return R(out, badge="Database + Documents", sources=src, suggestions=default_suggestions(ctx))
+        body, sug = _split_next(out)
+        return R(body, badge="Database + Documents", sources=src, suggestions=sug or default_suggestions(ctx))
     return None
 
 
@@ -1212,6 +1259,11 @@ def chat(sid: str, user: dict, text: str, attachments: list[dict], page: dict | 
     st = load_state(sid)
     try:
         out = route(text, attachments, st, user, page)
+        wp = _wrap_prompt(out, text, st)
+        if wp:
+            ai = llm.generate(wp, max_tokens=500)
+            if ai:
+                out = _apply_wrap(out, ai)
     except (ValueError, recruit.NotFound, ParseError) as e:
         out = R(f"I couldn't do that: {e}")
     st["history"].append({"role": "user", "text": text, "files": [a["name"] for a in attachments]})
@@ -1232,15 +1284,33 @@ def chat_stream(sid: str, user: dict, text: str, attachments: list[dict], page: 
     finally:
         _MODE.stream = False
     spec = out.pop("_stream", None) if isinstance(out, dict) else None
+    wrap = None
+    if not spec:
+        wp = _wrap_prompt(out, text, st)
+        if wp:
+            wrap = out
+            spec = {"prompt": wp, "src": [], "ctx": dict(st["ctx"]), "badge": "AI + Database"}
     if spec:
-        parts = []
+        parts, sent = [], 0
         for piece in llm.stream(spec["prompt"], max_tokens=700):
             parts.append(piece)
-            yield {"delta": piece}
+            full = "".join(parts)
+            i = full.find("NEXT:")
+            lim = i if i >= 0 else max(0, len(full) - 5)
+            if lim > sent:
+                yield {"delta": full[sent:lim]}
+                sent = lim
         full = "".join(parts).strip()
-        if full:
-            out = R(full, badge=spec.get("badge", "Database + Documents"), sources=spec["src"],
-                    suggestions=default_suggestions(spec["ctx"]))
+        body, sug = _split_next(full)
+        if len(body) > sent and "NEXT:" not in full:
+            yield {"delta": body[sent:]}
+        if body and wrap is not None:
+            out = _apply_wrap(wrap, full)
+        elif body:
+            out = R(body, badge=spec.get("badge", "Database + Documents"), sources=spec["src"],
+                    suggestions=sug or default_suggestions(spec["ctx"]))
+        elif wrap is not None:
+            out = wrap   # AI failed: the data answer is still correct, keep it
         else:   # AI failed: use the document / menu answer instead
             a = knowledge.answer(text)
             out = (R(a["text"], badge="Documents", sources=a["sources"], suggestions=default_suggestions(spec["ctx"]))
