@@ -278,6 +278,33 @@ def download(fid: int, u=Depends(current_user)):
 
 
 # ------------------------------------------------------------- assistant
+async def _atts(files_, u):
+    atts = []
+    for f in files_ or []:
+        try:
+            atts.append({"name": f.filename, "text": read_file(await f.read(), f.filename or "file.txt")})
+        except ParseError as e:
+            atts.append({"name": f.filename, "text": "", "error": str(e)})
+    if u["role"] == "Interviewer" and atts:
+        raise HTTPException(403, "Interviewers can't upload files")
+    return atts
+
+
+@bot.post("/chat/stream")
+async def chat_stream(session_id: str = Form(...), message: str = Form(""), job_id: int | None = Form(None),
+                      candidate_id: int | None = Form(None), files_: list[UploadFile] | None = File(None, alias="files"),
+                      u=Depends(current_user)):
+    """Same as /chat but streams: lines of JSON, {"delta": "..."} while writing and {"final": {...}} at the end."""
+    import json as _json
+    from fastapi.responses import StreamingResponse
+    atts = await _atts(files_, u)
+
+    def gen():
+        for ev in assistant.chat_stream(session_id, u, message, atts, {"job_id": job_id, "candidate_id": candidate_id}):
+            yield _json.dumps(ev) + "\n"
+    return StreamingResponse(gen(), media_type="application/x-ndjson", headers={"X-Accel-Buffering": "no"})
+
+
 @bot.post("/chat")
 async def chat(session_id: str = Form(...), message: str = Form(""), job_id: int | None = Form(None),
                candidate_id: int | None = Form(None), files_: list[UploadFile] | None = File(None, alias="files"),
