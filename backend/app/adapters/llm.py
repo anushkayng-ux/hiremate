@@ -75,11 +75,46 @@ class GeminiLLM:
         good = sorted((n for n in names if n.startswith("gemini") and "flash" in n), key=rank)
         return good[0] if good else None
 
+    @staticmethod
+    def _gen_cfg(model: str, max_tokens: int) -> dict:
+        cfg = {"temperature": 0.2, "maxOutputTokens": max_tokens}
+        if "2.5" in model or "flash-latest" in model:
+            cfg["thinkingConfig"] = {"thinkingBudget": 0}   # no hidden "thinking": answers start in about a second
+        return cfg
+
+    def stream(self, prompt: str, system: str = SYSTEM, max_tokens: int = 900):
+        """Yield the answer in small pieces as Gemini writes it."""
+        import json as _json
+        for attempt in (0, 1):
+            r = requests.post(f"{self.BASE}/{self.model}:streamGenerateContent", params={"key": self.key, "alt": "sse"},
+                              stream=True, timeout=config.LLM_TIMEOUT, json={
+                "systemInstruction": {"parts": [{"text": system}]},
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": self._gen_cfg(self.model, max_tokens)})
+            if r.status_code == 404 and attempt == 0:
+                alt = self._pick_model()
+                if alt and alt != self.model:
+                    self.model = alt
+                    self.name = f"Gemini ({alt}){' · paid' if self.paid else ' · free tier'}"
+                    continue
+            if r.status_code >= 400:
+                raise RuntimeError(f"Gemini {r.status_code} for model {self.model}: {r.text[:200]}")
+            for line in r.iter_lines(decode_unicode=True):
+                if line and line.startswith("data:"):
+                    try:
+                        parts = _json.loads(line[5:])["candidates"][0]["content"]["parts"]
+                    except (KeyError, IndexError, ValueError):
+                        continue
+                    txt = "".join(p.get("text", "") for p in parts)
+                    if txt:
+                        yield txt
+            return
+
     def _call(self, model: str, prompt: str, system: str, max_tokens: int) -> str:
         r = requests.post(f"{self.BASE}/{model}:generateContent", params={"key": self.key}, timeout=config.LLM_TIMEOUT, json={
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": max_tokens}})
+            "generationConfig": self._gen_cfg(model, max_tokens)})
         if r.status_code >= 400:
             # never put the key (it is in the URL) into logs or errors
             raise RuntimeError(f"Gemini {r.status_code} for model {model}: {r.text[:200]}")
@@ -223,6 +258,22 @@ def status() -> dict:
     s = _ai_settings()
     return {"provider": llm.name if llm else "Templates (no AI key set)", "connected": bool(llm),
             "plan": PROVIDERS[s["provider"]][0]}
+
+
+def stream(prompt: str, system: str = SYSTEM, max_tokens: int = 900):
+    """Yield text pieces. Falls back to one piece when the model cannot stream. Yields nothing on failure."""
+    llm = get_llm()
+    if not llm:
+        return
+    try:
+        if hasattr(llm, "stream"):
+            yield from llm.stream(prompt, system, max_tokens)
+        else:
+            out = llm.generate(prompt, system, max_tokens).strip()
+            if out:
+                yield out
+    except Exception as e:  # noqa: BLE001
+        log.warning("LLM stream failed (%s); falling back to template", e)
 
 
 def generate(prompt: str, system: str = SYSTEM, max_tokens: int = 900) -> str | None:
