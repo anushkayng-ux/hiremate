@@ -857,11 +857,12 @@ def _wrap_prompt(out: dict, text: str, st: dict) -> str | None:
     tb = out.get("table")
     if tb and tb.get("rows"):
         data += "\nTable columns: " + ", ".join(tb["head"]) + "\n" + "\n".join(" | ".join(str(c) for c in r) for r in tb["rows"][:10])
-    return ("You are HireMate, a friendly recruiting assistant for the Vishal Mega Mart HR team. The system already looked up "
-            "the facts below from the database. Explain them like ChatGPT would: very simple words, warm and clear. "
-            "FORMAT (markdown): '**Answer:** one short sentence', then '### Why' with 2 to 4 bullets (bold the names), then "
-            "'### Next step' with one action. Use ONLY the facts in DATA; never invent names or numbers. A table is shown "
-            "separately, so do not repeat it. Under 120 words." + NEXT_RULE +
+    return ("You are HireMate, a smart, friendly recruiting assistant for the Vishal Mega Mart HR team. The system already looked up "
+            "the facts below from the database. Explain them like a great colleague would: very simple words, warm, clear, useful. "
+            "FORMAT (markdown, each item on its own line): '**Answer:** one short sentence', blank line, '### Why' then 2 to 4 "
+            "bullets starting with '- ' (bold the names and numbers), blank line, '### Next step' then one bullet with a clear action. "
+            "Facts come ONLY from DATA; never invent names or numbers. You may add one short piece of HR advice from general "
+            "recruiting knowledge if it helps. A table is shown separately, so do not repeat it. Under 140 words." + NEXT_RULE +
             f"\n\nCONVERSATION SO FAR:\n{_hist_text(st, 4)}\n\nRECRUITER ASKED: {text}\n\nDATA:\n{data[:2500]}")
 
 
@@ -886,17 +887,21 @@ DATA = re.compile(r"\b(candidates?|applicants?|jobs?|roles?|scores?|match(es|ed)
 def _pure_writing(text: str) -> bool:
     """A general writing / advice request that needs no database facts (so no borrowed names)."""
     t = text.lower()
-    return bool(WRITE.search(t)) and not DATA.search(t)
+    if DATA.search(t):
+        return False
+    return bool(WRITE.search(t)) or len(t.split()) >= 3   # any general question or task with no company data
 
 
 def _llm_answer(text: str, st: dict, ctx: dict) -> dict | None:
     if _pure_writing(text) and not _is_followup(text.lower(), [], None):
-        prompt = ("You are HireMate, a friendly writing and HR assistant for the Vishal Mega Mart HR team. Answer like ChatGPT: "
-                  "do exactly what the recruiter asks, in very simple words, in clean markdown.\n"
-                  "RULES: This is a general task. Do NOT use any real candidate, employee or job names from anywhere; "
-                  "use placeholders like [Name], [Store], [City], [Date] where a detail is needed. Never invent facts, "
-                  "numbers or policies. No citations. No filler. Do not repeat the question. "
-                  "For writing tasks, give only the finished text (short, ready to use). For advice, use 3 to 6 short bullets." + NEXT_RULE + "\n\n"
+        prompt = ("You are HireMate, a smart, friendly writing, HR and general-knowledge assistant for the Vishal Mega Mart HR team. "
+                  "Answer like ChatGPT: do exactly what the recruiter asks, in very simple words, in clean well-structured markdown.\n"
+                  "RULES: This is a general task, so use your own knowledge. Do NOT use any real candidate, employee or job names; "
+                  "use placeholders like [Name], [Store], [City], [Date] where a detail is needed. Never invent company policies "
+                  "or statistics. No filler. Do not repeat the question.\n"
+                  "FORMAT: for writing tasks give only the finished text, ready to use. For questions or advice give a one-line "
+                  "direct answer in bold, then 3 to 6 bullets starting with '- ' (each on its own line, key words in bold), "
+                  "then '### Tip' with one practical tip. Use a short table only when comparing options." + NEXT_RULE + "\n\n"
                   f"CONVERSATION SO FAR:\n{_hist_text(st, 4)}\n\nRECRUITER NOW: {text}")
         if getattr(_MODE, "stream", False):
             return {"_stream": {"prompt": prompt, "src": [], "ctx": dict(ctx), "badge": "AI writing"}}
@@ -915,8 +920,9 @@ def _llm_answer(text: str, st: dict, ctx: dict) -> dict | None:
               "No filler, do not repeat the question.\n"
               "FORMAT (markdown): for questions, use '**Answer:** one short sentence', then '### Why' with 2 to 4 bullets (bold the names), "
               "then '### Next step' with one action. For writing tasks (paragraph, summary, message) just write the text, no headings. "
-              "Use a markdown table only when comparing 2 or more people. Keep it under 150 words. Cite documents like [1]. "
-              "If the data really has no answer, say 'That is not in the data.' and list what you can answer, as bullets." + NEXT_RULE +
+              "Use a markdown table only when comparing 2 or more people. Keep it under 170 words. Cite documents like [1]. "
+              "Each bullet goes on its own line starting with '- '. If the data has no answer about the company, still help: give "
+              "a useful general answer from your own recruiting knowledge and say 'General advice, not from your data.'" + NEXT_RULE +
               f"\n\nCONVERSATION SO FAR:\n{_hist_text(st)}\n\nDATABASE:\n{data_snapshot()}\n\nDOCUMENTS:\n{docs or 'none'}"
               f"\n\nRECRUITER NOW: {text}")
     src = [{"n": i + 1, "title": h["meta"]["title"], "type": h["meta"]["type"], "key": h["meta"]["doc_key"]}

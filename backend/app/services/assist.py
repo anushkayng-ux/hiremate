@@ -6,6 +6,7 @@ a template version is returned, so every feature works offline. `ai` in the resu
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 
 from .. import db
@@ -55,16 +56,25 @@ def summary(job_id: int, cid: int) -> dict:
     proven = [r["skill"] for r in m["rows"] if r["status"] == "Proven"]
     gaps = [r["skill"] for r in m["rows"] if r["status"] == "Missing"]
     tmpl = "\n".join([
-        f"• Strengths: {', '.join(proven[:4]) or 'none proven yet'} (Match data)",
-        f"• Experience: {c['headline']}, {c['years']:g} years in total (CV)",
-        f"• Gaps: {', '.join(gaps[:3]) or 'no missing skills'} (Match data)",
-        f"• Fit: {m['score']}% match for {j['title']}; "
-        f"{'meets' if m['meets_years'] else 'below'} the {j['min_years']:g}+ years asked (Match data)"])
+        f"- **Strengths:** {', '.join(proven[:4]) or 'none proven yet'}",
+        f"- **Experience:** {c['headline']}, {c['years']:g} years in total",
+        f"- **Gaps:** {', '.join(gaps[:3]) or 'no missing skills'}",
+        f"- **Fit:** {m['score']}% match for {j['title']}; "
+        f"{'meets' if m['meets_years'] else 'below'} the {j['min_years']:g}+ years asked"])
     out = llm.generate(
-        "Write a short candidate summary for a retail recruiter. Use ONLY the CV and match data below. "
-        "4 bullet points starting with '• ': strengths, relevant experience, skill gaps, and fit. Each under 25 words, "
-        "each ending with its source in brackets, like (CV: Assistant Store Manager) or (Match data).\n\n"
-        f"JOB:\n{j['description']}\n\nCV:\n{c['cv_text'][:2500]}\n\nMATCH DATA:\n{match_brief(j, c, m)}")
+        "You are a helpful recruiting assistant. Write a short candidate summary for a retail HR manager in very simple words. "
+        "Use ONLY the CV and match data below. Output EXACTLY 5 lines in this markdown format, one per line, nothing else:\n"
+        "- **Verdict:** one clear sentence (should we move this person forward, and why)\n"
+        "- **Strengths:** 2 or 3 skills with proof from the CV\n"
+        "- **Experience:** the most relevant job, place and time\n"
+        "- **Gaps:** missing skills, or 'None'\n"
+        "- **Next step:** one action for the recruiter\n"
+        "Each line under 25 words. No brackets, no source tags, no numbers like 'Match data'.\n\n"
+        f"JOB:\n{j['description']}\n\nCV:\n{c['cv_text'][:2500]}\n\nMATCH DATA:\n{match_brief(j, c, m)}", max_tokens=400)
+    if out:   # make sure every point is on its own line, even if the AI used '•' on one line
+        out = re.sub(r"\s*[•●]\s*", "\n- ", out).strip()
+        out = re.sub(r"(?<!\n)\s+(?=- \*\*)", "\n", out)
+        out = re.sub(r"\n{2,}", "\n", out)
     return {"text": out or tmpl, "ai": bool(out)}
 
 
