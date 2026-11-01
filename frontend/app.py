@@ -179,6 +179,7 @@ with st.sidebar:
 ui.show_toast()
 ui.show_undo()
 st.session_state.view_ctx = {}  # pages fill this with the job / candidate on screen
+st.session_state["_nav_key"] = next((k for k, p in pages.items() if p is nav), "dashboard")
 nav.run()
 _TOTAL = (time.perf_counter() - _T0) * 1000
 

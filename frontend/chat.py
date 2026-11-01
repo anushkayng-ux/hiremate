@@ -24,7 +24,8 @@ def send(text: str, files=None) -> None:
     sid, msgs = _session()
     msgs.append({"role": "user", "text": text, "files": [f.name for f in files or []]})
     data = {"session_id": sid, "message": text}
-    data |= {k: str(v) for k, v in (st.session_state.get("view_ctx") or {}).items() if v}
+    ctx = st.session_state.get("view_ctx") or st.session_state.get("chat_ctx") or {}
+    data |= {k: str(v) for k, v in ctx.items() if v}
     with st.spinner("Thinking…"):
         try:
             r = api.post("/assistant/chat", data=data,
@@ -111,29 +112,22 @@ def conversation(pfx: str) -> str | None:
     return clicked
 
 
-@st.dialog("Ask AI", width="large")
-def window():
-    top = st.columns([4, 1])
-    ctx = st.session_state.get("view_ctx") or {}
-    top[0].caption("I can see everything in HireMate, whatever page you're on."
-                   + (" I'll use the page you have open for 'this job' / 'this candidate'." if ctx else ""))
-    if top[1].button("New chat", key="w_new", width="stretch"):
-        new_chat()
-    box = st.container(height=470)
-    with box:
-        clicked = conversation("w")
-    pre = st.session_state.pop("chat_prefill", None)
-    inp = st.chat_input("Ask anything, or attach a JD / CVs / policy", accept_file="multiple",
-                        file_type=["pdf", "docx", "txt"], key="w_input")
-    if pre or clicked or inp:
-        if inp:
-            send(inp.text or "", inp.files)
-        else:
-            send(pre or clicked)
-        st.rerun(scope="fragment")
-
-
 def open_window(prefill: str | None = None) -> None:
+    """Open the full Ask AI page. Remembers the page and the job / candidate you were looking at."""
     if prefill:
         st.session_state.chat_prefill = prefill
-    window()
+    ctx = st.session_state.get("view_ctx")
+    if ctx:
+        st.session_state.chat_ctx = dict(ctx)
+    if "chat_back" not in st.session_state or st.session_state.get("_nav_key") not in (None, "asha"):
+        st.session_state.chat_back = st.session_state.get("_nav_key") or "dashboard"
+    ui.go("asha")
+
+
+def scroll_to_end() -> None:
+    """Scroll the page down to the newest message."""
+    import streamlit.components.v1 as components
+    components.html(
+        "<script>setTimeout(()=>{const d=window.parent.document;"
+        "const m=d.querySelector('[data-testid=\"stAppScrollToBottomContainer\"]')||d.querySelector('[data-testid=\"stMain\"]')||d.querySelector('section.main')||d.querySelector('main');"
+        "if(m){m.scrollTo({top:m.scrollHeight,behavior:'smooth'});}},250);</script>", height=0)
