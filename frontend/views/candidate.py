@@ -114,7 +114,7 @@ if tab == "Overview":
             if key in st.session_state:
                 s = st.session_state[key]
                 st.markdown(s["text"])
-                st.caption("Written by AI from the CV." if s["ai"] else "Simple version (no AI key set).")
+                st.caption("Written by AI from the CV." if s["ai"] else "Simple version (AI not answering; check Settings → AI model → Test).")
             else:
                 st.markdown('<p class="muted small">Click <b>Write with AI</b> for a short summary of this person.</p>',
                             unsafe_allow_html=True)
