@@ -547,6 +547,12 @@ def ui_label(stage: str) -> str:
     return {"Applied": "New", "Screening": "Reviewing", "Selected": "Hired", "Rejected": "Not selected"}.get(stage, stage)
 
 
+def busy_reply(ctx) -> dict:
+    return R("The AI service (Google Gemini free tier) is busy right now, so I could not write this one. "
+             "Please try again in a few seconds. Questions about your data still work instantly.",
+             suggestions=default_suggestions(ctx))
+
+
 def menu_reply(ctx: dict) -> dict:
     jobs = recruit.list_jobs(status="Open")
     ex = [f"Who matches {jobs[0]['short']}?"] if jobs else []
@@ -797,6 +803,63 @@ def criteria_intent(text: str, t: str, fj: dict | None, ctx: dict, st: dict, by:
 
 
 # ================================================================ router
+FOLLOW = re.compile(r"^(and |also |then |ok |okay |now |so )?(write|make|give|turn|rewrite|shorten|expand|explain|summari[sz]e|elaborate|"
+                    r"continue|more|why|how come|what about|can you|could you|please|tell me more|in short|short|simpler|"
+                    r"in simple|a paragraph|one line|bullet|list them|compare them|which one|who among)\b")
+
+
+def _is_followup(t: str, cs: list, fj) -> bool:
+    """Short messages that lean on the chat so far ('write a paragraph', 'make it shorter')."""
+    if len(t.split()) > 14 or cs or fj:
+        return False
+    if re.search(r"\b(jd|job description|email|mail|interview|schedule|shortlist|reject|add|create|delete|upload)\b", t):
+        return False
+    return bool(FOLLOW.search(t))
+
+
+def _hist_text(st: dict, n: int = 6) -> str:
+    out = []
+    for m in (st.get("history") or [])[-n:]:
+        if m["role"] == "user":
+            out.append(f"Recruiter: {m.get('text', '')}")
+        else:
+            line = m.get("reply") or m.get("text") or ""
+            tb = m.get("table")
+            if tb and tb.get("rows"):
+                line += " Table: " + "; ".join(" | ".join(str(c) for c in r) for r in tb["rows"][:8])
+            if m.get("bullets"):
+                line += " " + " ".join(str(b) for b in m["bullets"][:6])
+            out.append(f"Assistant: {line[:700]}")
+    return "\n".join(out) or "none"
+
+
+def _llm_answer(text: str, st: dict, ctx: dict) -> dict | None:
+    hits = knowledge.retrieve(text, k=3)
+    docs = "\n".join(f"[{i + 1}] {h['meta']['title']}: {h['text']}" for i, h in enumerate(hits))
+    prompt = ("You are HireMate, a sharp, friendly recruiting assistant for the Vishal Mega Mart HR team. Talk like ChatGPT: "
+              "understand what the recruiter means from the conversation so far, and do what they ask, including writing tasks "
+              "(a paragraph, a summary, a message, a comparison, advice) using ONLY the data below for facts. "
+              "Short follow-ups such as 'write a paragraph', 'make it shorter' or 'why' refer to your last answer.\n"
+              "Write in very simple words. Always name the specific people, jobs, scores, skills and dates. Never invent people or numbers. "
+              "No filler, do not repeat the question.\n"
+              "FORMAT (markdown): for questions, use '**Answer:** one short sentence', then '### Why' with 2 to 4 bullets (bold the names), "
+              "then '### Next step' with one action. For writing tasks (paragraph, summary, message) just write the text, no headings. "
+              "Use a markdown table only when comparing 2 or more people. Keep it under 150 words. Cite documents like [1]. "
+              "If the data really has no answer, say 'That is not in the data.' and list what you can answer, as bullets."
+              f"\n\nCONVERSATION SO FAR:\n{_hist_text(st)}\n\nDATABASE:\n{data_snapshot()}\n\nDOCUMENTS:\n{docs or 'none'}"
+              f"\n\nRECRUITER NOW: {text}")
+    src = [{"n": i + 1, "title": h["meta"]["title"], "type": h["meta"]["type"], "key": h["meta"]["doc_key"]}
+           for i, h in enumerate(hits)]
+    if getattr(_MODE, "stream", False):
+        return {"_stream": {"prompt": prompt, "src": src, "ctx": dict(ctx)}}
+    out = llm.generate(prompt, max_tokens=700)
+    if out:
+        return R(out, badge="Database + Documents", sources=src, suggestions=default_suggestions(ctx))
+    return None
+
+
+
+
 def route(text: str, attachments: list[dict], st: dict, user: dict, page: dict | None = None) -> dict:
     by = user["name"]
     ctx = st["ctx"]
@@ -833,6 +896,12 @@ def route(text: str, attachments: list[dict], st: dict, user: dict, page: dict |
                  "after your knowledge store. Attach a file or just tell me what you need.",
                  suggestions=["Who matches Store Manager?", "Write a JD for a cashier in Ghaziabad",
                               "Show the knowledge store", "Which jobs have the most applications?"])
+
+    # ---- follow-up that leans on the chat so far: let the AI answer with the history
+    if not attachments and st.get("history") and llm.get_llm() and _is_followup(t, cs, fj):
+        out = _llm_answer(text, st, ctx)
+        if out:
+            return out
 
     # ---- attachments
     if attachments:
@@ -1097,35 +1166,18 @@ def route(text: str, attachments: list[dict], st: dict, user: dict, page: dict |
             ctx["cand_id"] = cs[0]["id"]
         return ins
 
-    # ---- anything else: with AI on, answer from the whole database + documents
+    # ---- anything else: with AI on, answer from the whole database + documents + the chat so far
     if llm.get_llm():
-        hits = knowledge.retrieve(text, k=3)
-        docs = "\n".join(f"[{i + 1}] {h['meta']['title']}: {h['text']}" for i, h in enumerate(hits))
-        prompt = ("You are a sharp recruiting analyst. Answer the recruiter's question using ONLY the data below (the full "
-                  "current database plus matching documents). Write in very simple words, short lines, no filler, no repeating "
-                  "the question, no general advice. Always name the specific people, jobs, scores, skills and dates.\n"
-                  "FORMAT (markdown, exactly this layout):\n"
-                  "**Answer:** one short sentence with the direct answer or recommendation.\n\n"
-                  "### Why\n- 2 to 4 short bullets, each with a name or number. Bold the names, like **Anjali Sharma**.\n\n"
-                  "### Next step\n- one concrete action.\n\n"
-                  "Leave a blank line between parts. Use a markdown table only when comparing 2 or more people. Skip a part "
-                  "if it has nothing to say. Keep it under 130 words. Cite documents like [1]. If the data does not have the "
-                  "answer, say 'That is not in the data.' and list what you can answer, as bullets."
-                  f"\n\nDATABASE:\n{data_snapshot()}\n\nDOCUMENTS:\n{docs or 'none'}\n\nQUESTION: {text}")
-        src = [{"n": i + 1, "title": h["meta"]["title"], "type": h["meta"]["type"], "key": h["meta"]["doc_key"]}
-               for i, h in enumerate(hits)]
-        if getattr(_MODE, "stream", False):
-            return {"_stream": {"prompt": prompt, "src": src, "ctx": dict(ctx)}}
-        out = llm.generate(prompt, max_tokens=700)
+        out = _llm_answer(text, st, ctx)
         if out:
-            return R(out, badge="Database + Documents", sources=src, suggestions=default_suggestions(ctx))
+            return out
 
     # ---- documents (RAG)
     a = knowledge.answer(text)
     if not a["ai"] and a["sources"] and a["sources"][0]["type"] in ("CV", "JD"):
         return menu_reply(ctx)
     if not a["grounded"]:
-        return menu_reply(ctx)
+        return busy_reply(ctx) if llm.get_llm() else menu_reply(ctx)
     return R(a["text"], badge="Documents" if a["grounded"] else None, sources=a["sources"],
              suggestions=default_suggestions(ctx) if a["grounded"] else
              ["What can you do?", *default_suggestions(ctx)[:2]])
@@ -1166,7 +1218,7 @@ def chat_stream(sid: str, user: dict, text: str, attachments: list[dict], page: 
         else:   # AI failed: use the document / menu answer instead
             a = knowledge.answer(text)
             out = (R(a["text"], badge="Documents", sources=a["sources"], suggestions=default_suggestions(spec["ctx"]))
-                   if a["grounded"] and a["sources"] and a["sources"][0]["type"] not in ("CV", "JD") else menu_reply(spec["ctx"]))
+                   if a["grounded"] and a["sources"] and a["sources"][0]["type"] not in ("CV", "JD") else busy_reply(spec["ctx"]))
     st["history"].append({"role": "user", "text": text, "files": [a["name"] for a in attachments]})
     st["history"].append({"role": "assistant", **out})
     save_state(sid, user["id"], st)
