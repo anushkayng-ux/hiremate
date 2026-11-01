@@ -28,10 +28,10 @@ def _fill(ek, pk, email, pw):
 def _signin_recruiter():
     st.markdown('<p class="small muted" style="margin:.2rem 0">Try a demo account (one click):</p>', unsafe_allow_html=True)
     a, b, c = st.columns(3)
-    for col, (lbl, em) in zip((a, b, c), [("Admin", "muskan@hiremate.demo"), ("Recruiter", "recruiter@hiremate.demo"),
+    for col, (lbl, em) in zip((a, b, c), [("Admin", "admin@hiremate.demo"), ("Recruiter", "recruiter@hiremate.demo"),
                                            ("Interviewer", "interviewer@hiremate.demo")]):
         col.button(lbl, key=f"d_{lbl}", width="stretch", on_click=_fill, args=("r_email", "r_pw", em, "recruit123"))
-    st.session_state.setdefault("r_email", "muskan@hiremate.demo")
+    st.session_state.setdefault("r_email", "admin@hiremate.demo")
     st.session_state.setdefault("r_pw", "recruit123")
     with st.form("login", border=True):
         email = st.text_input("Work email", key="r_email")
@@ -153,6 +153,7 @@ pages = {
     "knowledge": st.Page(V / "knowledge.py", title="Documents", url_path="documents", visibility="hidden"),
     "analytics": st.Page(V / "analytics.py", title="Reports", url_path="reports", visibility="hidden"),
     "screening": st.Page(V / "screening.py", title="Compare", url_path="compare", visibility="hidden"),
+    "team": st.Page(V / "team.py", title="Team", url_path="team", visibility="hidden"),
     "asha": st.Page(V / "ask_ai.py", title="Ask AI", url_path="ask-ai", visibility="hidden"),
     "job": st.Page(V / "job.py", title="Job", url_path="job", visibility="hidden"),
     "review": st.Page(V / "review.py", title="Quick review", url_path="review", visibility="hidden"),
@@ -163,7 +164,7 @@ ui.PAGES.update(pages)
 st.logo(str(Path(__file__).parent / "logo.svg"), size="large")
 
 nav = st.navigation([pages[k] for k in ("dashboard", "jobs", "candidates", "interviews", "settings", "knowledge",
-                                         "analytics", "screening", "asha", "job", "review", "candidate")])
+                                         "analytics", "screening", "team", "asha", "job", "review", "candidate")])
 
 with st.sidebar:
     u = st.session_state.user

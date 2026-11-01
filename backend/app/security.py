@@ -63,9 +63,12 @@ def current_user(cred: HTTPAuthorizationCredentials | None = Depends(bearer)) ->
     data = _decode(cred)
     if data.get("kind") == "cand":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Candidates can't open the recruiter portal")
-    u = db.one("SELECT id, email, name, role FROM users WHERE id=?", (int(data["sub"]),))
+    u = db.one("SELECT id, email, name, role, active FROM users WHERE id=?", (int(data["sub"]),))
     if not u:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
+    if u.get("active") == 0:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This account is turned off. Ask an Admin.")
+    u.pop("active", None)
     return u
 
 

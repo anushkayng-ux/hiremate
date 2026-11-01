@@ -54,7 +54,7 @@ goto wait
 echo  Server is up. >> "%LOG%"
 echo.
 echo  Opening http://localhost:8501 in your browser.
-echo  Sign in: muskan@hiremate.demo / recruit123
+echo  Sign in: admin@hiremate.demo / recruit123
 echo  Keep this window open while you test. Close it to stop HireMate.
 start "" http://127.0.0.1:8501
 cd frontend

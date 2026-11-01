@@ -129,17 +129,8 @@ with right:
         st.markdown("**Team & roles**")
         for x in api.get("/settings/users"):
             st.markdown(f"{x['name']} · <span class='muted small'>{x['email']} · {x['role']}</span>", unsafe_allow_html=True)
-        if u["role"] == "Admin":
-            with st.expander("Add a teammate"):
-                with st.form("nu", clear_on_submit=True):
-                    n = st.text_input("Name")
-                    e = st.text_input("Email")
-                    r = st.selectbox("Role", ["Recruiter", "Interviewer", "Admin"])
-                    p = st.text_input("Temporary password", type="password")
-                    if st.form_submit_button("Add"):
-                        if ui.safe(api.post, "/settings/users", json={"name": n, "email": e, "role": r, "password": p}):
-                            ui.toast_next(f"Added {n}")
-                            st.rerun()
+        if st.button("Manage team" if u["role"] == "Admin" else "See team", icon=":material/group:", width="stretch"):
+            ui.go("team")
     with st.container(border=True):
         st.markdown("**Knowledge store**")
         if st.button("Open knowledge store"):

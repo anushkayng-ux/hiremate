@@ -11,9 +11,9 @@ from .sample_data import CVS, HR_DOCS, JOBS
 from .security import hash_pw
 from .services import recruit
 
-USERS = [("muskan@hiremate.demo", "Muskan Sethi", "Admin"),
-         ("recruiter@hiremate.demo", "Ravi Kumar", "Recruiter"),
-         ("interviewer@hiremate.demo", "Neha Gupta", "Interviewer")]
+USERS = [("admin@hiremate.demo", "Demo Admin", "Admin"),
+         ("recruiter@hiremate.demo", "Demo Recruiter", "Recruiter"),
+         ("interviewer@hiremate.demo", "Demo Interviewer", "Interviewer")]
 
 # job key, cv key, stage
 APPS = [("sm", "c1", "Shortlisted"), ("sm", "c2", "Screening"), ("sm", "c4", "Applied"), ("sm", "c5", "Screening"),
@@ -86,7 +86,7 @@ def reset_and_seed() -> None:
             "Store Manager, Raj Nagar", None, db.now()))
     db.run("INSERT INTO notes(candidate_id,job_id,text,by_name,created_at) VALUES(?,?,?,?,?)",
            (cand_ids["c1"], job_ids["sm"], "Strong festive-season experience. Ask about P&L exposure in the interview.",
-            "Muskan Sethi", db.now()))
+            "Demo Admin", db.now()))
     # a sent invite and a reply from the candidate, so both portals show a real conversation
     from .services import assist as _assist
     from .services import portal as _portal
@@ -97,7 +97,7 @@ def reset_and_seed() -> None:
                   f"We would like to invite you to an interview on {(today + timedelta(days=3)):%a %d %b} at 11:00 AM, in person, "
                   "with the Area Manager.\n\nPlease bring a photo ID and a copy of your CV. Reply to confirm, or to ask for "
                   f"another slot.\n\nRegards,\nRecruitment Team\n\n{_assist.AI_LINE}", "Sent", "out", db.now(), db.now(),
-                  "Muskan Sethi", "Muskan Sethi", db.now()))
+                  "Demo Admin", "Demo Admin", db.now()))
     _portal.reply(cand_ids["c6"], inv, "Thank you, I will be there. Is there parking at the distribution centre, and "
                                        "should I bring my forklift certificate?")
     # some people have waited a few days, so 'Waiting too long' has something to show
@@ -115,4 +115,4 @@ def ensure_seeded() -> None:
 
 if __name__ == "__main__":
     reset_and_seed()
-    print("Seeded demo data. Sign in with muskan@hiremate.demo /", DEMO_PASSWORD)
+    print("Seeded demo data. Sign in with admin@hiremate.demo /", DEMO_PASSWORD)

@@ -101,6 +101,7 @@ def conn() -> sqlite3.Connection:
 _NEW_COLS = {
     "emails": [("direction", "TEXT DEFAULT 'out'"), ("sent_at", "TEXT"), ("sent_by", "TEXT"), ("read_at", "TEXT"),
                ("parent_id", "INTEGER"), ("cand_read_at", "TEXT")],
+    "users": [("active", "INTEGER DEFAULT 1"), ("last_login", "TEXT")],
     "interviews": [("candidate_response", "TEXT"), ("candidate_note", "TEXT"), ("responded_at", "TEXT")],
 }
 
@@ -111,6 +112,11 @@ def _migrate(c: sqlite3.Connection) -> None:
         for name, decl in cols:
             if name not in have:
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+    # old demo accounts get neutral demo names
+    c.execute("UPDATE users SET email='admin@hiremate.demo', name='Demo Admin' WHERE lower(email)='muskan@hiremate.demo' "
+              "AND NOT EXISTS(SELECT 1 FROM users WHERE email='admin@hiremate.demo')")
+    c.execute("UPDATE users SET name='Demo Recruiter' WHERE email='recruiter@hiremate.demo' AND name='Ravi Kumar'")
+    c.execute("UPDATE users SET name='Demo Interviewer' WHERE email='interviewer@hiremate.demo' AND name='Neha Gupta'")
     # 'Approved' used to mean 'ready to send'; it is now 'Sent'
     c.execute("UPDATE emails SET status='Sent', sent_at=COALESCE(sent_at, approved_at), sent_by=COALESCE(sent_by, approved_by) "
               "WHERE status='Approved'")

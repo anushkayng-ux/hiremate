@@ -384,7 +384,7 @@ def set_blind(on: bool, u=Depends(rec)):
 
 @sets.get("/users")
 def users(u=Depends(current_user)):
-    return db.rows("SELECT id, email, name, role, created_at FROM users ORDER BY id")
+    return db.rows("SELECT id, email, name, role, COALESCE(active,1) AS active, last_login, created_at FROM users ORDER BY id")
 
 
 @sets.post("/users")
@@ -394,8 +394,45 @@ def add_user(body: UserIn, u=Depends(admin)):
     if db.one("SELECT id FROM users WHERE lower(email)=lower(?)", (body.email,)):
         raise HTTPException(409, "That email already has an account")
     uid = db.run("INSERT INTO users(email,name,role,password_hash,created_at) VALUES(?,?,?,?,?)",
-                 (body.email, body.name, body.role, hash_pw(body.password), db.now()))
+                 (body.email.strip(), body.name.strip(), body.role, hash_pw(body.password), db.now()))
+    db.log("User added", f"{body.name} ({body.role})", u["name"], entity="user", entity_id=uid)
     return db.one("SELECT id, email, name, role FROM users WHERE id=?", (uid,))
+
+
+class UserEdit(BaseModel):
+    name: str | None = None
+    role: str | None = None
+    active: bool | None = None
+    password: str | None = Field(default=None, min_length=6)
+
+
+def _active_admins(exclude: int | None = None) -> int:
+    return db.one("SELECT COUNT(*) n FROM users WHERE role='Admin' AND COALESCE(active,1)=1 AND id!=?",
+                  (exclude or -1,))["n"]
+
+
+@sets.patch("/users/{uid}")
+def edit_user(uid: int, body: UserEdit, u=Depends(admin)):
+    """Admin: change name or role, switch an account off/on, or set a new password. Never deletes anyone."""
+    t = db.one("SELECT * FROM users WHERE id=?", (uid,))
+    if not t:
+        raise HTTPException(404, "User not found")
+    if body.role is not None and body.role not in ("Admin", "Recruiter", "Interviewer"):
+        raise HTTPException(422, "Role must be Admin, Recruiter or Interviewer")
+    losing_admin = t["role"] == "Admin" and ((body.role and body.role != "Admin") or body.active is False)
+    if losing_admin and _active_admins(exclude=uid) == 0:
+        raise HTTPException(409, "There must always be at least one active Admin")
+    if uid == u["id"] and body.active is False:
+        raise HTTPException(409, "You can't turn off your own account")
+    db.run("UPDATE users SET name=COALESCE(?,name), role=COALESCE(?,role), active=COALESCE(?,active) WHERE id=?",
+           ((body.name or "").strip() or None, body.role, None if body.active is None else int(body.active), uid))
+    if body.password:
+        db.run("UPDATE users SET password_hash=? WHERE id=?", (hash_pw(body.password), uid))
+    what = ", ".join(x for x in [body.role and f"role {body.role}", body.active is not None and
+                                 ("turned on" if body.active else "turned off"), body.password and "new password",
+                                 body.name and "name"] if x)
+    db.log("User updated", f"{t['name']}: {what}", u["name"], entity="user", entity_id=uid)
+    return db.one("SELECT id, email, name, role, COALESCE(active,1) AS active, last_login FROM users WHERE id=?", (uid,))
 
 
 @sets.post("/reset-demo")

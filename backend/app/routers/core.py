@@ -29,6 +29,9 @@ def login(body: Login):
     u = db.one("SELECT * FROM users WHERE lower(email)=lower(?)", (body.email.strip(),))
     if not u or not check_pw(body.password, u["password_hash"]):
         raise HTTPException(401, "Wrong email or password")
+    if u.get("active") == 0:
+        raise HTTPException(401, "This account is turned off. Ask an Admin.")
+    db.run("UPDATE users SET last_login=? WHERE id=?", (db.now(), u["id"]))
     return {"token": make_token(u), "user": {k: u[k] for k in ("id", "email", "name", "role")}}
 
 

@@ -92,7 +92,7 @@ It installs everything on the first run (3–5 minutes) and opens http://localho
    uvicorn backend.app.main:app --port 8000
    cd frontend && streamlit run app.py
    ```
-5. Sign in: `muskan@hiremate.demo` / `recruit123` (Admin).
+5. Sign in: `admin@hiremate.demo` / `recruit123` (Admin).
    Others: `recruiter@hiremate.demo`, `interviewer@hiremate.demo` (same password).
 
 - The database seeds itself on first start (3 jobs, 7 CVs, 8 policy docs).

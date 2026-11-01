@@ -40,7 +40,7 @@ Skills: visual merchandising, customer service, Hindi, Excel"""
 @pytest.fixture(scope="module")
 def c():
     with TestClient(app) as client:
-        r = client.post("/auth/login", json={"email": "muskan@hiremate.demo", "password": "recruit123"})
+        r = client.post("/auth/login", json={"email": "admin@hiremate.demo", "password": "recruit123"})
         assert r.status_code == 200
         client.headers["Authorization"] = "Bearer " + r.json()["token"]
         yield client
@@ -56,7 +56,7 @@ def chat(c, msg, sid, files=None, **page):
 def test_auth_required():
     with TestClient(app) as anon:
         assert anon.get("/jobs").status_code == 401
-        assert anon.post("/auth/login", json={"email": "muskan@hiremate.demo", "password": "x"}).status_code == 401
+        assert anon.post("/auth/login", json={"email": "admin@hiremate.demo", "password": "x"}).status_code == 401
 
 
 def test_seed_and_ranking(c):
@@ -113,7 +113,7 @@ def test_interview_feedback_email_flow(c):
     e = c.post("/emails", json={"job_id": wh["id"], "candidate_id": arjun["id"], "type": "invite"}).json()
     assert e["status"] == "Draft" and "AI tool" in e["body"] and "2030" in e["body"]
     e2 = c.post(f"/emails/{e['id']}/send").json()
-    assert e2["status"] == "Sent" and e2["sent_by"] == "Muskan Sethi"
+    assert e2["status"] == "Sent" and e2["sent_by"] == "Demo Admin"
     hi = c.post("/emails", json={"job_id": wh["id"], "candidate_id": arjun["id"], "type": "selection", "lang": "Hindi"}).json()
     assert "प्रिय" in hi["body"]
 
@@ -374,3 +374,27 @@ def test_candidate_portal_full_loop(c):
     nh = {"Authorization": "Bearer " + s.json()["token"]}
     assert p.get("/portal/applications", headers=nh).json()[0]["job_id"] == jid
     assert any(x["name"] == "Ravi Kumar" for x in c.get(f"/match/job/{jid}").json())
+
+
+def test_team_management(c):
+    users = {u["email"]: u for u in c.get("/settings/users").json()}
+    assert users["admin@hiremate.demo"]["name"] == "Demo Admin"
+    assert users["recruiter@hiremate.demo"]["name"] == "Demo Recruiter"
+    # add, change role, turn off, new password
+    n = c.post("/settings/users", json={"name": "Test Person", "email": "t.person@hiremate.demo", "role": "Interviewer",
+                                        "password": "temp123"}).json()
+    r = c.patch(f"/settings/users/{n['id']}", json={"role": "Recruiter"})
+    assert r.status_code == 200 and r.json()["role"] == "Recruiter"
+    r = c.patch(f"/settings/users/{n['id']}", json={"active": False})
+    assert r.json()["active"] == 0
+    with TestClient(app) as t:
+        assert t.post("/auth/login", json={"email": "t.person@hiremate.demo", "password": "temp123"}).status_code == 401
+        c.patch(f"/settings/users/{n['id']}", json={"active": True, "password": "newpass1"})
+        ok = t.post("/auth/login", json={"email": "t.person@hiremate.demo", "password": "newpass1"})
+        assert ok.status_code == 200
+        t.headers["Authorization"] = "Bearer " + ok.json()["token"]
+        assert t.patch(f"/settings/users/{n['id']}", json={"role": "Admin"}).status_code == 403  # not an Admin
+    # the last Admin can't be turned off or demoted, and you can't turn off yourself
+    me = users["admin@hiremate.demo"]["id"]
+    assert c.patch(f"/settings/users/{me}", json={"active": False}).status_code == 409
+    assert c.patch(f"/settings/users/{me}", json={"role": "Recruiter"}).status_code == 409
