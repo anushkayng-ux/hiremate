@@ -833,7 +833,32 @@ def _hist_text(st: dict, n: int = 6) -> str:
     return "\n".join(out) or "none"
 
 
+WRITE = re.compile(r"\b(write|draft|compose|rewrite|rephrase|reword|proofread|translate|improve|polish|paragraph|message|"
+                   r"announcement|speech|post|caption|template|tips?|ideas?|advice)\b")
+DATA = re.compile(r"\b(candidates?|applicants?|jobs?|roles?|scores?|match(es|ed)?|interviews?|stages?|shortlist\w*|"
+                  r"applied|knowledge|polic(y|ies)|our|waiting|pending|today|top|who|whom|which|experience|notice|years?|salary|"
+                  r"hire|hired|email|them|him|her|his|their|this|these|those|it)\b")
+
+
+def _pure_writing(text: str) -> bool:
+    """A general writing / advice request that needs no database facts (so no borrowed names)."""
+    t = text.lower()
+    return bool(WRITE.search(t)) and not DATA.search(t)
+
+
 def _llm_answer(text: str, st: dict, ctx: dict) -> dict | None:
+    if _pure_writing(text) and not _is_followup(text.lower(), [], None):
+        prompt = ("You are HireMate, a friendly writing and HR assistant for the Vishal Mega Mart HR team. Answer like ChatGPT: "
+                  "do exactly what the recruiter asks, in very simple words, in clean markdown.\n"
+                  "RULES: This is a general task. Do NOT use any real candidate, employee or job names from anywhere; "
+                  "use placeholders like [Name], [Store], [City], [Date] where a detail is needed. Never invent facts, "
+                  "numbers or policies. No citations. No filler. Do not repeat the question. "
+                  "For writing tasks, give only the finished text (short, ready to use). For advice, use 3 to 6 short bullets.\n\n"
+                  f"CONVERSATION SO FAR:\n{_hist_text(st, 4)}\n\nRECRUITER NOW: {text}")
+        if getattr(_MODE, "stream", False):
+            return {"_stream": {"prompt": prompt, "src": [], "ctx": dict(ctx), "badge": "AI writing"}}
+        out = llm.generate(prompt, max_tokens=700)
+        return R(out, badge="AI writing", suggestions=default_suggestions(ctx)) if out else None
     hits = knowledge.retrieve(text, k=3)
     docs = "\n".join(f"[{i + 1}] {h['meta']['title']}: {h['text']}" for i, h in enumerate(hits))
     prompt = ("You are HireMate, a sharp, friendly recruiting assistant for the Vishal Mega Mart HR team. Talk like ChatGPT: "
@@ -1214,7 +1239,8 @@ def chat_stream(sid: str, user: dict, text: str, attachments: list[dict], page: 
             yield {"delta": piece}
         full = "".join(parts).strip()
         if full:
-            out = R(full, badge="Database + Documents", sources=spec["src"], suggestions=default_suggestions(spec["ctx"]))
+            out = R(full, badge=spec.get("badge", "Database + Documents"), sources=spec["src"],
+                    suggestions=default_suggestions(spec["ctx"]))
         else:   # AI failed: use the document / menu answer instead
             a = knowledge.answer(text)
             out = (R(a["text"], badge="Documents", sources=a["sources"], suggestions=default_suggestions(spec["ctx"]))
