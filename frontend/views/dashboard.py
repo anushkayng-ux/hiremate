@@ -22,7 +22,7 @@ if h2.button("New job", icon=":material/add:", type="primary", width="stretch", 
     ui.go("jobs", open_create=True)
 
 sets = ui.safe(api.get, "/settings") or {}
-if not (sets.get("llm") or {}).get("connected"):
+if rec and not (sets.get("llm") or {}).get("connected"):
     a, b = st.columns([4, 1.2], vertical_alignment="center")
     a.markdown('<div class="flag" style="font-size:.95rem"><b>AI is off.</b> Summaries, interview questions, emails and '
                'answers are using simple templates. Add your free Google Gemini key in Settings to switch AI on '

@@ -6,6 +6,9 @@ import ui
 
 me = st.session_state.user
 is_admin = me["role"] == "Admin"
+if me["role"] not in ("Admin", "Recruiter"):
+    st.markdown('<div class="warnbox">The team page is for Admins and Recruiters only.</div>', unsafe_allow_html=True)
+    st.stop()
 
 if st.button("← Settings", type="tertiary"):
     ui.go("settings")
