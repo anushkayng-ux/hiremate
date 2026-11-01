@@ -266,23 +266,6 @@ def header(title: str, eyebrow: str = "", sub: str = "") -> None:
                 + (f'<p class="muted" style="margin:.25rem 0 .5rem;font-size:.98rem">{esc(sub)}</p>' if sub else ""),
                 unsafe_allow_html=True)
 
-def ai_note(page: str, job_id: int | None = None) -> None:
-    """A short note written by the AI at the top of a page. Kept for 10 minutes per page."""
-    import time
-    key = f"_brief_{page}_{job_id}"
-    hit = st.session_state.get(key)
-    if not hit or time.time() - hit[0] > 600:
-        try:
-            with st.spinner("AI is writing a note…"):
-                r = api.get("/ai/brief", page=page, job_id=job_id)
-            hit = (time.time(), r.get("text", ""))
-        except api.ApiError:
-            hit = (time.time() - 540, "")   # try again in a minute
-        st.session_state[key] = hit
-    if hit[1]:
-        st.markdown(f'<div class="ainote"><span class="aibadge">✦ AI note</span> {esc(hit[1])}</div>', unsafe_allow_html=True)
-
-
 # --------------------------------------------------------------- components
 def stage_pill(stage: str | None) -> str:
     if not stage:
