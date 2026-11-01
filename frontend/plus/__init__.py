@@ -1,0 +1,1 @@
+"""HireMate Plus screens (frontend)."""
