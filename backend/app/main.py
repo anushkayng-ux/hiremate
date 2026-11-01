@@ -15,6 +15,9 @@ from .adapters.vectorstore import get_store
 from .routers import portal as rp
 from .routers import assist as ra
 from .routers import core as rc
+from .routers import extras as rx
+from .plus import ensure_schema as plus_schema
+from .plus import router as rplus
 from .seed import ensure_seeded
 from .services import recruit
 
@@ -45,6 +48,7 @@ def rebuild_index() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     db.conn()
+    plus_schema()
     ensure_seeded()
     from .services import portal
     portal.ensure_all_accounts()  # older databases: give every candidate a portal account
@@ -54,11 +58,11 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="HireMate API", version="1.0", lifespan=lifespan,
-              description="AI recruiter assistant for the Vishal Mega Mart HR team. Synthetic data only.")
+              description="AI recruiter assistant for an HR recruitment team. Synthetic data only.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 for r in (rc.auth, rc.jobs, rc.cands, rc.apps, rc.match, ra.ivs, ra.emails, ra.ai, ra.kb, ra.bot, ra.stats, ra.sets,
-          ra.crit, ra.sm, rp.portal):
+          ra.crit, ra.sm, rp.portal, rx.x, rx.px, rplus.plus, rplus.pplus):
     app.include_router(r)
 
 

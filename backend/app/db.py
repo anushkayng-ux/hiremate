@@ -73,6 +73,19 @@ CREATE TABLE IF NOT EXISTS candidate_accounts(
   password_hash TEXT NOT NULL, created_at TEXT, last_login TEXT);
 CREATE TABLE IF NOT EXISTS generated_files(
   id INTEGER PRIMARY KEY, name TEXT, path TEXT, mime TEXT, created_at TEXT);
+CREATE TABLE IF NOT EXISTS screening_questions(
+  id INTEGER PRIMARY KEY, job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  question TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'yesno', ideal TEXT, knockout INTEGER DEFAULT 0,
+  position INTEGER DEFAULT 0, created_at TEXT);
+CREATE TABLE IF NOT EXISTS screening_answers(
+  application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+  question_id INTEGER NOT NULL REFERENCES screening_questions(id) ON DELETE CASCADE,
+  answer TEXT, created_at TEXT, PRIMARY KEY(application_id, question_id));
+CREATE TABLE IF NOT EXISTS offers(
+  id INTEGER PRIMARY KEY, application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+  designation TEXT, ctc INTEGER, joining_date TEXT, location TEXT, reporting_to TEXT, probation_months INTEGER DEFAULT 6,
+  letter TEXT, status TEXT DEFAULT 'Draft', candidate_note TEXT, created_by TEXT, created_at TEXT,
+  sent_at TEXT, responded_at TEXT);
 """
 
 _lock = threading.RLock()
@@ -103,6 +116,8 @@ _NEW_COLS = {
                ("parent_id", "INTEGER"), ("cand_read_at", "TEXT")],
     "users": [("active", "INTEGER DEFAULT 1"), ("last_login", "TEXT")],
     "interviews": [("candidate_response", "TEXT"), ("candidate_note", "TEXT"), ("responded_at", "TEXT")],
+    "applications": [("source", "TEXT DEFAULT 'Recruiter upload'"), ("referred_by", "TEXT")],
+    "candidates": [("consent_at", "TEXT"), ("anonymised_at", "TEXT")],
 }
 
 
@@ -113,10 +128,10 @@ def _migrate(c: sqlite3.Connection) -> None:
             if name not in have:
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
     # old demo accounts get neutral demo names
-    c.execute("UPDATE users SET email='admin@hiremate.demo', name='Demo Admin' WHERE lower(email)='muskan@hiremate.demo' "
+    c.execute("UPDATE users SET email='admin@hiremate.demo', name='Demo Admin' WHERE role='Admin' AND lower(email) LIKE '%@hiremate.demo' AND lower(email)!='admin@hiremate.demo' "
               "AND NOT EXISTS(SELECT 1 FROM users WHERE email='admin@hiremate.demo')")
-    c.execute("UPDATE users SET name='Demo Recruiter' WHERE email='recruiter@hiremate.demo' AND name='Ravi Kumar'")
-    c.execute("UPDATE users SET name='Demo Interviewer' WHERE email='interviewer@hiremate.demo' AND name='Neha Gupta'")
+    c.execute("UPDATE users SET name='Demo Recruiter' WHERE email='recruiter@hiremate.demo' AND name NOT LIKE 'Demo %'")
+    c.execute("UPDATE users SET name='Demo Interviewer' WHERE email='interviewer@hiremate.demo' AND name NOT LIKE 'Demo %'")
     # 'Approved' used to mean 'ready to send'; it is now 'Sent'
     c.execute("UPDATE emails SET status='Sent', sent_at=COALESCE(sent_at, approved_at), sent_by=COALESCE(sent_by, approved_by) "
               "WHERE status='Approved'")

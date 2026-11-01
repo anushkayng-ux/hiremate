@@ -105,6 +105,10 @@ def reset_and_seed() -> None:
     old_ts = (_dt.datetime.now() - _dt.timedelta(days=4)).strftime("%Y-%m-%d %H:%M:%S")
     db.run("UPDATE applications SET updated_at=?, created_at=? WHERE candidate_id=? AND stage='Applied'",
            (old_ts, old_ts, cand_ids["c4"]))
+    from .services import extras as _extras
+    _extras.seed(job_ids, cand_ids, apps)
+    from .plus import insights as _plus
+    _plus.seed_all()
     recruit.recompute_all()
 
 
