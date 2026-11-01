@@ -126,6 +126,40 @@ section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="pa
 .emptycol{border:1.5px dashed #CBD5E1;border-radius:10px;padding:1.2rem .8rem;text-align:center;color:#64748B;font-size:.9rem;background:#fff}
 div[data-testid="stDialog"] div[role="dialog"]{width:min(900px,94vw)}
 [data-testid="stExpander"] details{background:#fff;border-radius:10px}
+/* ---- modern + tight (overrides) ---- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+html,body,.stApp,button,input,textarea{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif!important;font-size:14.5px}
+.stApp{background:#F6F7FB}
+[data-testid="stHeader"]{height:1.6rem}
+.block-container{padding:.6rem 1.6rem 4rem!important;max-width:1400px}
+[data-testid="stVerticalBlock"]{gap:.6rem}
+[data-testid="stHorizontalBlock"]{gap:.7rem;margin-bottom:.1rem}
+h1{font-size:1.45rem!important;letter-spacing:-.025em}
+h3{font-size:1rem!important;margin:0 0 .1rem!important}
+[data-testid="stMarkdownContainer"] p{margin-bottom:.1rem;line-height:1.45}
+[data-testid="stMarkdownContainer"]{overflow:visible}
+[data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"]:not(.st-key-askfab){border-radius:14px!important;
+  padding:.85rem 1rem 1.1rem!important;gap:.7rem;box-shadow:0 1px 2px rgba(15,23,42,.04),0 4px 14px rgba(15,23,42,.04)}
+[data-testid="stForm"]{border-radius:14px!important;padding:.8rem!important}
+.pill,.tag,.score{padding:.1rem .55rem;font-size:.74rem}
+.has,.miss,.skill{padding:.08rem .5rem;font-size:.74rem;margin:.08rem .15rem .08rem 0}
+.kpi{font-size:1.55rem}.kpil{font-size:.78rem;margin-top:.1rem}
+.prow{gap:.6rem}.pname{font-size:.96rem}
+.note,.okbox,.warnbox{padding:.45rem .7rem;font-size:.84rem;border-radius:10px}
+.nextbar{padding:.55rem .8rem;border-radius:14px}
+.jstep{padding:.4rem .6rem;border-radius:12px}.jstep .n{font-size:1.15rem}
+.steps{margin:.2rem 0}.dot{width:22px;height:22px;font-size:.72rem}
+button[data-testid^="stBaseButton"]{border-radius:10px!important;min-height:2.1rem;padding:.2rem .8rem}
+button[data-testid="stBaseButton-primary"]{box-shadow:0 2px 6px rgba(37,99,235,.28)}
+[data-baseweb="input"],[data-baseweb="select"]>div,[data-baseweb="textarea"]{border-radius:10px!important}
+[data-testid="stWidgetLabel"] p{font-size:.8rem;font-weight:600;color:#475569;margin-bottom:.1rem}
+section[data-testid="stSidebar"]{background:#fff}
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a{padding:.4rem .65rem;border-radius:10px;margin:.05rem 0}
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a span{font-size:.9rem}
+.hero{border-radius:22px;padding:1.6rem 1.5rem}
+.hero .hp{padding:.4rem .75rem;margin:.3rem 0;border-radius:10px;font-size:.92rem}
+.resume{padding:.6rem .8rem;font-size:.82rem;line-height:1.5}
+[data-testid="stExpander"] details{border-radius:12px}
 </style>
 """
 
