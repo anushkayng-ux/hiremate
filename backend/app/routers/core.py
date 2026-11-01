@@ -54,6 +54,7 @@ class JobUpdate(BaseModel):
     min_years: float | None = None
     qualification: str | None = None
     status: str | None = None
+    description: str | None = None
     must: list[str] | None = None
     nice: list[str] | None = None
 
