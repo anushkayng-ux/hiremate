@@ -227,6 +227,10 @@ h1 + p, [data-testid="stMarkdownContainer"] h1 + p{color:#64748B!important;font-
 
 .kpil{margin-top:.2rem;padding-bottom:.35rem;line-height:1.3}
 .kpi{padding-top:.15rem}
+
+.ainote{background:linear-gradient(90deg,#EFF6FF,#F5F3FF);border:1px solid #DBEAFE;border-radius:12px;padding:.65rem .9rem;
+  font-size:.92rem;line-height:1.5;color:#1E293B;margin:.1rem 0 .2rem}
+.aibadge{font-size:.72rem;font-weight:700;color:#4F46E5;background:#fff;border:1px solid #E0E7FF;border-radius:999px;padding:.05rem .5rem;margin-right:.4rem;white-space:nowrap}
 </style>
 """
 
@@ -263,6 +267,22 @@ def header(title: str, eyebrow: str = "", sub: str = "") -> None:
     st.markdown(f'<h1 style="margin:0">{esc(title)}</h1>'
                 + (f'<p class="muted" style="margin:.25rem 0 .5rem;font-size:.98rem">{esc(sub)}</p>' if sub else ""),
                 unsafe_allow_html=True)
+
+def ai_note(page: str, job_id: int | None = None) -> None:
+    """A short note written by the AI at the top of a page. Kept for 10 minutes per page."""
+    import time
+    key = f"_brief_{page}_{job_id}"
+    hit = st.session_state.get(key)
+    if not hit or time.time() - hit[0] > 600:
+        try:
+            with st.spinner("AI is writing a note…"):
+                r = api.get("/ai/brief", page=page, job_id=job_id)
+            hit = (time.time(), r.get("text", ""))
+        except api.ApiError:
+            hit = (time.time() - 540, "")   # try again in a minute
+        st.session_state[key] = hit
+    if hit[1]:
+        st.markdown(f'<div class="ainote"><span class="aibadge">✦ AI note</span> {esc(hit[1])}</div>', unsafe_allow_html=True)
 
 
 # --------------------------------------------------------------- components
