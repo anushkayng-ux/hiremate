@@ -35,3 +35,12 @@ with right:
                       '<span class="muted small">None found. Add a "Skills:" line to your CV.</span>')
         with st.expander("Your CV text"):
             st.text(p["cv_text"])
+
+with st.expander("Delete my data"):
+    st.markdown("You can ask us to delete your CV and personal details at any time (India's DPDP Act 2023). "
+                "This signs you out and cannot be undone.")
+    sure = st.checkbox("I understand. Delete my CV, contact details and messages.")
+    if st.button("Delete my data", disabled=not sure):
+        ui.safe(api.post, "/portal/me/erase")
+        st.session_state.clear()
+        st.rerun()

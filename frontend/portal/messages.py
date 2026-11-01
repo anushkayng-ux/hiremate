@@ -11,7 +11,7 @@ if not msgs:
 for m in msgs:
     mine = m["from_me"]
     with st.container(border=True):
-        badge = ('<span class="pill" style="background:#2563EB;color:#fff">New</span> ' if m["unread"] else "")
+        badge = ('<span class="pill" style="background:#0E7A5C;color:#fff">New</span> ' if m["unread"] else "")
         st.markdown(f'{badge}<span class="eyb">{"You replied" if mine else "From the recruitment team"} · '
                     f'{ui.esc(m["job_title"])} · {ui.fmt_ts(m["at"])}</span><br><b>{ui.esc(m["subject"])}</b>',
                     unsafe_allow_html=True)

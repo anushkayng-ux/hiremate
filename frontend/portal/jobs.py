@@ -15,7 +15,7 @@ for j in jobs:
                    f'{j["min_years"]:g}+ years</span><br><span class="small">Skills needed: {ui.esc(", ".join(j["must"]))}</span>',
                    unsafe_allow_html=True)
         if j["applied"]:
-            y.markdown('<span class="pill" style="background:#DCFCE7;color:#15803D">Applied ✓</span>', unsafe_allow_html=True)
+            y.markdown('<span class="pill" style="background:#DDF1E8;color:#0E7A5C">Applied ✓</span>', unsafe_allow_html=True)
         elif y.button("Apply", key=f"a{j['id']}", type="primary", width="stretch"):
             r = ui.safe(api.post, "/portal/apply", json={"job_id": j["id"]})
             if r:
