@@ -5,6 +5,9 @@ import ui
 import widgets
 
 ui.header("Settings", sub="AI model, screening rules, documents and reports.")
+if st.session_state.user["role"] not in ("Admin", "Recruiter"):
+    st.markdown('<div class="warnbox">Settings are for Admins and Recruiters only.</div>', unsafe_allow_html=True)
+    st.stop()
 _a, _b, _ = st.columns([1, 1, 2])
 if _a.button("Documents & policies", icon=":material/menu_book:", width="stretch"):
     ui.go("knowledge")
@@ -158,7 +161,9 @@ with st.expander("How matching works"):
 - ML helpers: Naive Bayes (job family), Logistic Regression (shortlist chance), KNN (similar people),
   K-Means + PCA (talent groups). These are hints only.
 """)
-st.markdown("**Recent activity**")
-for l in api.get("/settings/activity", limit=15):
-    ui.html_block(f'<p class="small muted" style="margin:.1rem 0">{ui.fmt_ts(l["created_at"])} · '
-                  f'<b style="color:#0F172A">{ui.esc(l["action"])}</b> {ui.esc(l["detail"] or "")} · {ui.esc(l["by_name"])}</p>')
+if admin:
+    with st.container(border=True):
+        st.markdown("**Logs**")
+        st.caption("See who signed in, who changed what, and when. Only Admins can open it.")
+        if st.button("Open logs", icon=":material/receipt_long:"):
+            ui.go("logs")
