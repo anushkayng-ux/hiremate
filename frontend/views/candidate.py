@@ -111,12 +111,18 @@ if tab == "Overview":
             if b.button("Write with AI" if key not in st.session_state else "Rewrite", key="sumbtn", width="stretch"):
                 with st.spinner("Reading the CV…"):
                     st.session_state[key] = api.get("/ai/summary", job_id=jid, candidate_id=cid)
+            if key not in st.session_state:   # AI writes the summary on its own when the page opens
+                with st.spinner("AI is reading the CV…"):
+                    try:
+                        st.session_state[key] = api.get("/ai/summary", job_id=jid, candidate_id=cid)
+                    except api.ApiError:
+                        pass
             if key in st.session_state:
                 s = st.session_state[key]
                 st.markdown(s["text"])
                 st.caption("Written by AI from the CV." if s["ai"] else "Simple version (AI not answering; check Settings → AI model → Test).")
             else:
-                st.markdown('<p class="muted small">Click <b>Write with AI</b> for a short summary of this person.</p>',
+                st.markdown('<p class="muted small">The summary could not load. Click <b>Write with AI</b> to try again.</p>',
                             unsafe_allow_html=True)
     with right:
         with st.container(border=True):
