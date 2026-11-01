@@ -396,9 +396,8 @@ def briefing(user_name: str = "") -> dict:
     first = (["Start with " + ("the replies" if replies else f"{risks[0]['name']}" if risks else "the waiting list" if waits
                                else "today's interviews") + "."])
     text = "\n".join(f"- {x}" for x in lines + first)
-    out = llm.generate("Rewrite this HR morning briefing as 5 short, friendly bullet points for a recruiter. Keep every "
-                       "name and number exactly. No new facts.\n\n" + text, max_tokens=300)
-    return {"text": (out or text).strip(), "ai": bool(out), "date": today,
+    # Built in code from live data: instant, and every number is exact (no AI call on page open).
+    return {"text": text, "ai": False, "date": today,
             "counts": {"interviews": len(ivs), "replies": len(replies), "high_risk": len(risks), "waiting": len(waits),
                        "better_fit": len(moves), "drafts": drafts}}
 

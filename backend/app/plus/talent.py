@@ -17,7 +17,6 @@ from datetime import date
 from .. import db
 from . import lc
 from ..adapters import llm
-from ..core import parsing
 from ..services import recruit
 from ..services.smart import _span, _ym
 from . import insights
