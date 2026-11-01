@@ -236,14 +236,16 @@ def app_for(job_id: int, cid: int) -> dict | None:
     return db.one("SELECT * FROM applications WHERE job_id=? AND candidate_id=?", (job_id, cid))
 
 
-def apply(job_id: int, cid: int, by: str, stage: str = "Applied") -> dict:
+def apply(job_id: int, cid: int, by: str, stage: str = "Applied", source: str | None = None,
+          referred_by: str | None = None) -> dict:
     get_job(job_id)
     get_candidate(cid)
     a = app_for(job_id, cid)
     if a:
         return a
-    aid = db.run("INSERT INTO applications(job_id,candidate_id,stage,created_at,updated_at) VALUES(?,?,?,?,?)",
-                 (job_id, cid, stage, db.now(), db.now()))
+    src = source or ("Candidate portal" if by == "Candidate portal" else "Recruiter upload")
+    aid = db.run("INSERT INTO applications(job_id,candidate_id,stage,created_at,updated_at,source,referred_by) "
+                 "VALUES(?,?,?,?,?,?,?)", (job_id, cid, stage, db.now(), db.now(), src, referred_by))
     compute_job(job_id)
     db.log("Added to job", get_job(job_id)["title"], by, candidate_id=cid, job_id=job_id, entity="application",
            entity_id=aid)

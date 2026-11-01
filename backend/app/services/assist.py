@@ -15,7 +15,7 @@ from . import recruit
 
 EMAIL_TYPES = {"invite": "Interview invitation", "reminder": "Interview reminder", "followup": "Follow-up",
                "assessment": "Assessment instructions", "selection": "Selection", "rejection": "Rejection"}
-ALL_TYPES = {**EMAIL_TYPES, "reply": "Reply", "candidate": "Message from candidate"}
+ALL_TYPES = {**EMAIL_TYPES, "reply": "Reply", "candidate": "Message from candidate", "offer": "Offer letter"}
 AI_LINE = "This email was drafted with an AI tool and checked by our recruiter."
 AI_LINE_HI = "यह ईमेल एक AI टूल की मदद से लिखा गया और हमारे रिक्रूटर ने जाँचा है।"
 

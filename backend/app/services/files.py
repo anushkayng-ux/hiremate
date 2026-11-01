@@ -1,4 +1,4 @@
-"""Generate downloadable .docx files (e.g. a JD written by Asha)."""
+"""Generate downloadable .docx files (e.g. a JD written by Ask AI)."""
 from __future__ import annotations
 
 import re

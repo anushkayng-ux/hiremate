@@ -1,4 +1,4 @@
-"""Asha, the in-app assistant.
+"""Ask AI, the in-app assistant.
 
 How it works:
 1. A rule-based intent router handles actions (create job, add candidate, move stage, schedule,
@@ -21,7 +21,7 @@ from ..core.parsing import ParseError, classify, find_city, parse_cv, parse_jd
 from ..core.skills import skills_in
 from . import analytics, assist, criteria, files, interviews, knowledge, recruit
 
-BOT = "Asha"
+BOT = "Ask AI"
 YES = r"^(ok|okay|yes|yep|sure|go ahead|confirm|do it|haan|ha|please do|approve|send|send it|create|yes,)\b"
 NO = r"^(no|cancel|stop|not now|leave it)\b"
 
@@ -392,8 +392,15 @@ def data_snapshot() -> str:
                    f"listed only: {', '.join(x['skill'] for x in c['skills'] if x['status'] == 'Listed') or 'none'}")
         for a in c["applications"]:
             m = recruit.match_one(a["job_id"], c["id"])
+            src = db.one("SELECT source, referred_by FROM applications WHERE id=?", (a["id"],)) or {}
             out.append(f"    applied {a['job_title']}: stage {a['stage']}, match {m['score']}%, "
-                       f"missing must-haves: {', '.join(m['missing_must']) or 'none'}")
+                       f"missing must-haves: {', '.join(m['missing_must']) or 'none'}, source: {src.get('source') or 'n/a'}"
+                       + (f" (referred by {src['referred_by']})" if src.get("referred_by") else ""))
+            from . import extras
+            for q in extras.answers_for(a["id"])["items"]:
+                if q["answer"] not in (None, ""):
+                    out.append(f"      screening Q: {q['question']} -> {q['answer']}"
+                               + (" [does not match a must question]" if q["ok"] is False and q["knockout"] else ""))
     out.append("INTERVIEWS:")
     for i in interviews.list_all():
         out.append(f"- {i['candidate']} | {i['job_title']} | {i['date']} {i['time']} | {i['mode']} | "
@@ -412,6 +419,16 @@ def data_snapshot() -> str:
                      "ON a.id=i.application_id JOIN candidates c ON c.id=a.candidate_id JOIN jobs j ON j.id=a.job_id "
                      "WHERE i.candidate_response IS NOT NULL"):
         out.append(f"- {i['name']} answered the {i['title']} interview: {i['candidate_response']} {i['candidate_note'] or ''}")
+    out.append("OFFERS:")
+    from . import extras
+    for o in extras.offers_for():
+        out.append(f"- {o['candidate']} | {o['designation']} | CTC {o['ctc_text']} a year | joining {o['joining_date']} | "
+                   f"{o['status']}" + (f" | note: {o['candidate_note']}" if o.get("candidate_note") else ""))
+    mx = extras.metrics()
+    out.append(f"HIRING SPEED: time to hire {mx['time_to_hire_days'] or 'n/a'} days, time to interview "
+               f"{mx['time_to_interview_days'] or 'n/a'} days. By source: "
+               + "; ".join(f"{s['source']} {s['applications']} applied, {s['shortlisted']} shortlisted, {s['hired']} hired"
+                           for s in mx["by_source"]))
     out.append(criteria.snapshot())
     out.append("NOTES:")
     for n in db.rows("SELECT n.text, c.name FROM notes n JOIN candidates c ON c.id=n.candidate_id"):
@@ -857,7 +874,7 @@ def _wrap_prompt(out: dict, text: str, st: dict) -> str | None:
     tb = out.get("table")
     if tb and tb.get("rows"):
         data += "\nTable columns: " + ", ".join(tb["head"]) + "\n" + "\n".join(" | ".join(str(c) for c in r) for r in tb["rows"][:10])
-    return ("You are HireMate, a smart, friendly recruiting assistant for the Vishal Mega Mart HR team. The system already looked up "
+    return ("You are HireMate, a smart, friendly recruiting assistant for an HR recruitment team. The system already looked up "
             "the facts below from the database. Explain them like a great colleague would: very simple words, warm, clear, useful. "
             "FORMAT (markdown, each item on its own line): '**Answer:** one short sentence', blank line, '### Why' then 2 to 4 "
             "bullets starting with '- ' (bold the names and numbers), blank line, '### Next step' then one bullet with a clear action. "
@@ -894,7 +911,7 @@ def _pure_writing(text: str) -> bool:
 
 def _llm_answer(text: str, st: dict, ctx: dict) -> dict | None:
     if _pure_writing(text) and not _is_followup(text.lower(), [], None):
-        prompt = ("You are HireMate, a smart, friendly writing, HR and general-knowledge assistant for the Vishal Mega Mart HR team. "
+        prompt = ("You are HireMate, a smart, friendly writing, HR and general-knowledge assistant for an HR recruitment team. "
                   "Answer like ChatGPT: do exactly what the recruiter asks, in very simple words, in clean well-structured markdown.\n"
                   "RULES: This is a general task, so use your own knowledge. Do NOT use any real candidate, employee or job names; "
                   "use placeholders like [Name], [Store], [City], [Date] where a detail is needed. Never invent company policies "
@@ -912,7 +929,7 @@ def _llm_answer(text: str, st: dict, ctx: dict) -> dict | None:
         return R(body, badge="AI writing", suggestions=sug or default_suggestions(ctx))
     hits = knowledge.retrieve(text, k=3)
     docs = "\n".join(f"[{i + 1}] {h['meta']['title']}: {h['text']}" for i, h in enumerate(hits))
-    prompt = ("You are HireMate, a sharp, friendly recruiting assistant for the Vishal Mega Mart HR team. Talk like ChatGPT: "
+    prompt = ("You are HireMate, a sharp, friendly recruiting assistant for an HR recruitment team. Talk like ChatGPT: "
               "understand what the recruiter means from the conversation so far, and do what they ask, including writing tasks "
               "(a paragraph, a summary, a message, a comparison, advice) using ONLY the data below for facts. "
               "Short follow-ups such as 'write a paragraph', 'make it shorter' or 'why' refer to your last answer.\n"
