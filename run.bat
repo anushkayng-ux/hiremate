@@ -35,10 +35,8 @@ if errorlevel 1 goto fail
 if errorlevel 1 echo  ChromaDB skipped - the built-in search store is used. Everything still works.
 
 rem ---- stop an old HireMate that is still running (ports 8000 / 8501 only)
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 8000,8501 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { taskkill /PID $_.OwningProcess /T /F 2>$null | Out-Null }" >nul 2>nul
-for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8000 " ^| findstr LISTENING') do taskkill /PID %%p /T /F >nul 2>nul
-for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8501 " ^| findstr LISTENING') do taskkill /PID %%p /T /F >nul 2>nul
-timeout /t 2 /nobreak >nul
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8000 " ^| findstr LISTENING') do taskkill /PID %%p /F >nul 2>nul
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8501 " ^| findstr LISTENING') do taskkill /PID %%p /F >nul 2>nul
 
 echo  Starting the server...
 start "HireMate server - keep open" /min cmd /k ""%VPY%" -m uvicorn backend.app.main:app --port 8000"
