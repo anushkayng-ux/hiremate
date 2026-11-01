@@ -1102,12 +1102,16 @@ def route(text: str, attachments: list[dict], st: dict, user: dict, page: dict |
         hits = knowledge.retrieve(text, k=3)
         docs = "\n".join(f"[{i + 1}] {h['meta']['title']}: {h['text']}" for i, h in enumerate(hits))
         prompt = ("You are a sharp recruiting analyst. Answer the recruiter's question using ONLY the data below (the full "
-                  "current database plus matching documents). Rules: lead with the direct answer or a clear recommendation "
-                  "in the first sentence; always name the specific people, jobs, scores, skills and dates; give the reason "
-                  "in 2 to 4 short bullets with numbers; end with one concrete next step. No general advice, no filler, no "
-                  "repeating the question. Keep it under 150 words. Use a markdown table only when comparing people. Cite "
-                  "documents like [1]. If the data does not have the answer, say 'That is not in the data.' and name what "
-                  f"you can answer.\n\nDATABASE:\n{data_snapshot()}\n\nDOCUMENTS:\n{docs or 'none'}\n\nQUESTION: {text}")
+                  "current database plus matching documents). Write in very simple words, short lines, no filler, no repeating "
+                  "the question, no general advice. Always name the specific people, jobs, scores, skills and dates.\n"
+                  "FORMAT (markdown, exactly this layout):\n"
+                  "**Answer:** one short sentence with the direct answer or recommendation.\n\n"
+                  "### Why\n- 2 to 4 short bullets, each with a name or number. Bold the names, like **Anjali Sharma**.\n\n"
+                  "### Next step\n- one concrete action.\n\n"
+                  "Leave a blank line between parts. Use a markdown table only when comparing 2 or more people. Skip a part "
+                  "if it has nothing to say. Keep it under 130 words. Cite documents like [1]. If the data does not have the "
+                  "answer, say 'That is not in the data.' and list what you can answer, as bullets."
+                  f"\n\nDATABASE:\n{data_snapshot()}\n\nDOCUMENTS:\n{docs or 'none'}\n\nQUESTION: {text}")
         src = [{"n": i + 1, "title": h["meta"]["title"], "type": h["meta"]["type"], "key": h["meta"]["doc_key"]}
                for i, h in enumerate(hits)]
         if getattr(_MODE, "stream", False):
