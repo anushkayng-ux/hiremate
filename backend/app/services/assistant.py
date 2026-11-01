@@ -11,14 +11,15 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date, timedelta
+import threading
+from datetime import date, datetime, timedelta
 
 from .. import db
 from ..adapters import llm
 from ..core.jdcheck import jd_check
 from ..core.parsing import ParseError, classify, find_city, parse_cv, parse_jd
 from ..core.skills import skills_in
-from . import assist, criteria, files, interviews, knowledge, recruit
+from . import analytics, assist, criteria, files, interviews, knowledge, recruit
 
 BOT = "Asha"
 YES = r"^(ok|okay|yes|yep|sure|go ahead|confirm|do it|haan|ha|please do|approve|send|send it|create|yes,)\b"
@@ -47,8 +48,11 @@ def clear(sid: str) -> None:
 
 
 # ================================================================ helpers
+_MODE = threading.local()   # set while a streamed chat call is running
+
+
 def R(reply: str, **kw) -> dict:
-    return {"reply": reply, "badge": kw.get("badge"), "table": kw.get("table"), "sources": kw.get("sources", []),
+    return {"reply": reply, "badge": kw.get("badge"), "table": kw.get("table"), "bullets": kw.get("bullets"), "sources": kw.get("sources", []),
             "suggestions": [s for s in kw.get("suggestions", []) if s][:4], "doc": kw.get("doc"),
             "email": kw.get("email"), "link": kw.get("link"), "awaiting_yes": kw.get("awaiting_yes", False)}
 
@@ -413,6 +417,145 @@ def data_snapshot() -> str:
     for n in db.rows("SELECT n.text, c.name FROM notes n JOIN candidates c ON c.id=n.candidate_id"):
         out.append(f"- {n['name']}: {n['text']}")
     return "\n".join(out)
+
+
+def _days_since(ts: str | None) -> int:
+    try:
+        return max(0, (date.today() - datetime.fromisoformat(str(ts)[:19]).date()).days)
+    except (ValueError, TypeError):
+        return 0
+
+
+def insights(text: str, cs: list[dict], fj: dict | None, ctx: dict) -> dict | None:
+    """Specific answers straight from the data. They work with or without the AI key."""
+    t = text.lower()
+    c = cs[0] if cs else None
+
+    # what needs me today / priorities
+    if re.search(r"what (should i|do i|needs? me)|priorit|urgent|to-?do\b|next step|need(s)? (me|my attention)|pending work|do today|for today", t) \
+            and not c and not re.search(r"\bask\b|question", t):
+        needs = analytics.dashboard()["needs"]
+        if not needs:
+            return R("You are all caught up. Nothing needs you right now.", badge="Database",
+                     suggestions=default_suggestions(ctx))
+        kinds = {}
+        for n in needs:
+            kinds[n["kind"]] = kinds.get(n["kind"], 0) + 1
+        top = needs[0]
+        word = {"Decide": "to decide", "Feedback": "need feedback", "Schedule": "to book", "Screen": "CVs to review"}
+        return R(f"{len(needs)} things need you. Start with: {top['text']}. "
+                 + ", ".join(f"{v} {word[k]}" for k, v in kinds.items()) + ".", badge="Database",
+                 table={"head": ["#", "What to do", "Type"], "rows": [[i + 1, n["text"], n["kind"]] for i, n in enumerate(needs)]},
+                 link={"page": "dashboard", "label": "Open Home"},
+                 suggestions=default_suggestions(ctx))
+
+    # waiting too long
+    if re.search(r"waiting too long|stuck|delayed|overdue|too long|stale|no (action|update)|left behind", t):
+        rows = db.rows("SELECT a.stage, a.updated_at, c.name, j.title FROM applications a JOIN candidates c ON "
+                       "c.id=a.candidate_id JOIN jobs j ON j.id=a.job_id WHERE a.stage IN ('Applied','Screening','Shortlisted')")
+        late = sorted([(r, _days_since(r["updated_at"])) for r in rows], key=lambda x: -x[1])
+        late = [x for x in late if x[1] >= 3]
+        if not late:
+            return R("No one has been waiting more than 2 days. Good.", badge="Database", suggestions=default_suggestions(ctx))
+        return R(f"{len(late)} people have waited 3 days or more. The longest is {late[0][0]['name']} ({late[0][1]} days "
+                 f"in {ui_label(late[0][0]['stage'])}). Move them on before they accept another offer.", badge="Database",
+                 table={"head": ["Candidate", "Job", "Stage", "Days"],
+                        "rows": [[r["name"], r["title"], ui_label(r["stage"]), d] for r, d in late]},
+                 suggestions=[f"Summarize {r['name'].split()[0]}'s profile" for r, _ in late[:2]] + ["What should I do today?"])
+
+    # who should I hire / overall recommendation
+    if re.search(r"who should i (hire|pick|choose|select|call|interview|shortlist)|recommend|best (candidate|person|hire|overall)|"
+                 r"hire first|top pick", t) and not c:
+        jobs = [fj] if fj else recruit.list_jobs(status="Open")
+        rows, picks = [], []
+        for j in jobs:
+            res = [r for r in recruit.compute_job(j["id"]) if r["stage"] != "Rejected"][:1]
+            if not res:
+                continue
+            r = res[0]
+            m = recruit.match_one(j["id"], r["candidate_id"])
+            why = (f"{met(m)} must-haves, " if m["rows"] else "") + (f"missing {', '.join(m['missing_must'])}" if m["missing_must"] else "no must-have gaps")
+            rows.append([j["title"], r["name"], f"{r['score']}%", why, ui_label(r["stage"])])
+            picks.append((r["score"], r["name"], j["title"], bool(m["missing_must"])))
+        if not rows:
+            return R("No one has applied yet, so there is nobody to recommend.", badge="Database")
+        picks.sort(reverse=True)
+        s0 = picks[0]
+        return R(f"My pick: {s0[1]} for {s0[2]} ({s0[0]}%)"
+                 + (" but check the gap first." if s0[3] else ", with no must-have gaps.")
+                 + " One top person per job is below. The score is a guide. You decide.", badge="Database",
+                 table={"head": ["Job", "Top candidate", "Match", "Why", "Stage"], "rows": rows},
+                 suggestions=[f"Why is {s0[1].split()[0]} a good fit?", f"What should I ask {s0[1].split()[0]} in the interview?"])
+
+    # why is X a good fit / explain the score
+    if c and re.search(r"\bwhy\b|explain|reason|how (well|good)|good fit|suit|score|strong|weak", t) \
+            and not re.search(r"\bask\b|question", t):
+        j = job_of(c, fj)
+        m = recruit.match_one(j["id"], c["id"])
+        proven = [r for r in m["rows"] if r["status"] == "Proven"]
+        listed = [r for r in m["rows"] if r["status"] == "Listed"]
+        miss = [r for r in m["rows"] if r["status"] == "Missing"]
+        fitw = "a strong match" if m["score"] >= 70 else "a fair match" if m["score"] >= 50 else "a weak match"
+        pts = [f"Score {m['score']}% for {j['title']}: {fitw}.",
+               f"Skills: proven {', '.join(r['skill'] for r in proven) or 'none'}"
+               + (f"; only listed (not shown in work) {', '.join(r['skill'] for r in listed)}" if listed else "") + ".",
+               f"Gaps: {', '.join(r['skill'] for r in miss) or 'none'}.",
+               f"Experience: {c['years']:g} years, the job asks {j['min_years']:g}+ ({'meets it' if m['meets_years'] else 'below it'}).",
+               ]
+        ev = next((r for r in proven if r.get("evidence")), None)
+        if ev:
+            pts.append(f"Proof from the CV for {ev['skill']}: \"{str(ev['evidence'])[:140]}\"")
+        verdict = ("Worth an interview." if m["score"] >= 60 and not m["missing_must"] else
+                   "Interview, but ask about " + ", ".join(m["missing_must"]) + "." if m["score"] >= 50 else
+                   "Probably not for this job. Check other jobs.")
+        return R(f"{c['name']} is {fitw} for {j['title']} ({m['score']}%). " + verdict, badge="Database",
+                 bullets=pts, link={"page": "candidate", "candidate_id": c["id"], "job_id": j["id"], "label": f"Open {first(c)}"},
+                 suggestions=[f"What should I ask {first(c)} in the interview?", f"Draft an invitation for {first(c)}",
+                              f"Compare {first(c)} and " + (cs[1]["name"].split()[0] if len(cs) > 1 else "another candidate")])
+
+    # interview questions for X
+    if c and re.search(r"\bask\b|question|interview (plan|prep)|prepare", t):
+        j = job_of(c, fj)
+        qs = assist.questions(j["id"], c["id"])["questions"]
+        return R(f"{len(qs)} questions for {c['name']} ({j['title']}). Start with the Verification ones: they test the CV claims.",
+                 badge="Database", table={"head": ["Type", "Question", "A good answer"],
+                                          "rows": [[q.get("type", ""), q["question"], q.get("good_answer", "")] for q in qs]},
+                 suggestions=[f"Draft an invitation for {first(c)}", f"Why is {first(c)} a good fit?"])
+
+    # tell me about X (candidate)
+    if c and re.search(r"tell me about|who is|about\b|profile|summar|background|details|overview", t):
+        j = job_of(c, fj)
+        sm = assist.summary(j["id"], c["id"])["text"]
+        apps = ", ".join(f"{a['job_title']} ({ui_label(a['stage'])})" for a in c["applications"]) or "not added to any job"
+        return R(f"{c['name']}: {c['headline']}, {c['location']}. Applied to: {apps}.\n\n{sm}", badge="Database",
+                 link={"page": "candidate", "candidate_id": c["id"], "job_id": j["id"], "label": f"Open {first(c)}"},
+                 suggestions=[f"Why is {first(c)} a good fit?", f"What should I ask {first(c)} in the interview?"])
+
+    # tell me about a job
+    if fj and not c and re.search(r"tell me about|about\b|details|describe|overview|summar|what does|requirements|needs?|hiring for|status|pipeline|how many", t):
+        res = [r for r in recruit.compute_job(fj["id"]) if r["stage"] != "Rejected"]
+        sc = ", ".join(f"{v} {ui_label(k).lower()}" for k, v in fj["stage_counts"].items() if v) or "no applicants yet"
+        return R(f"{fj['title']} in {fj['location']}. {('Wants ' + format(fj['min_years'], 'g') + '+ years. ') if fj['min_years'] else 'No minimum experience. '}Pipeline: {sc}. "
+                 + (f"Best so far: {res[0]['name']} ({res[0]['score']}%)." if res else ""), badge="Database",
+                 bullets=[f"Must-have: {', '.join(fj['must']) or 'none'}", f"Nice to have: {', '.join(fj['nice']) or 'none'}"],
+                 link={"page": "job", "job_id": fj["id"], "label": f"Open {fj['short']}"},
+                 suggestions=[f"Who matches {fj['short']}?", f"Who should I hire for {fj['short']}?"])
+    return None
+
+
+def ui_label(stage: str) -> str:
+    return {"Applied": "New", "Screening": "Reviewing", "Selected": "Hired", "Rejected": "Not selected"}.get(stage, stage)
+
+
+def menu_reply(ctx: dict) -> dict:
+    jobs = recruit.list_jobs(status="Open")
+    ex = [f"Who matches {jobs[0]['short']}?"] if jobs else []
+    return R("That is not in the data I have, or I did not understand. Here are things I can answer with your real data:",
+             bullets=["Who should I hire first and why?", "What should I do today?", "Who is waiting too long?",
+                      "Why is <name> a good fit? / What should I ask <name>?", "Compare <name> and <name>",
+                      "Which candidates know <skill>? / Policy questions (shifts, notice, joining documents)"],
+             suggestions=(ex + ["What should I do today?", "Who should I hire first and why?"])[:4])
+
 
 
 def structured(text: str, cs: list[dict], fj: dict | None) -> dict | None:
@@ -945,22 +1088,40 @@ def route(text: str, attachments: list[dict], st: dict, user: dict, page: dict |
             s["suggestions"] = default_suggestions(ctx)
         return s
 
+    # ---- specific answers from the data (no AI key needed)
+    ins = insights(text, cs, fj, ctx)
+    if ins:
+        if fj:
+            ctx["job_id"] = fj["id"]
+        if cs:
+            ctx["cand_id"] = cs[0]["id"]
+        return ins
+
     # ---- anything else: with AI on, answer from the whole database + documents
     if llm.get_llm():
         hits = knowledge.retrieve(text, k=3)
         docs = "\n".join(f"[{i + 1}] {h['meta']['title']}: {h['text']}" for i, h in enumerate(hits))
-        out = llm.generate(
-            "Answer the recruiter's question using ONLY the data below. It is the full current database plus "
-            "matching documents. Use simple bullet points or a short table in markdown when listing people. "
-            "Cite documents like [1]. If the data does not have the answer, say 'That is not in the data.'\n\n"
-            f"DATABASE:\n{data_snapshot()}\n\nDOCUMENTS:\n{docs or 'none'}\n\nQUESTION: {text}", max_tokens=1200)
+        prompt = ("You are a sharp recruiting analyst. Answer the recruiter's question using ONLY the data below (the full "
+                  "current database plus matching documents). Rules: lead with the direct answer or a clear recommendation "
+                  "in the first sentence; always name the specific people, jobs, scores, skills and dates; give the reason "
+                  "in 2 to 4 short bullets with numbers; end with one concrete next step. No general advice, no filler, no "
+                  "repeating the question. Keep it under 150 words. Use a markdown table only when comparing people. Cite "
+                  "documents like [1]. If the data does not have the answer, say 'That is not in the data.' and name what "
+                  f"you can answer.\n\nDATABASE:\n{data_snapshot()}\n\nDOCUMENTS:\n{docs or 'none'}\n\nQUESTION: {text}")
+        src = [{"n": i + 1, "title": h["meta"]["title"], "type": h["meta"]["type"], "key": h["meta"]["doc_key"]}
+               for i, h in enumerate(hits)]
+        if getattr(_MODE, "stream", False):
+            return {"_stream": {"prompt": prompt, "src": src, "ctx": dict(ctx)}}
+        out = llm.generate(prompt, max_tokens=700)
         if out:
-            src = [{"n": i + 1, "title": h["meta"]["title"], "type": h["meta"]["type"], "key": h["meta"]["doc_key"]}
-                   for i, h in enumerate(hits)]
             return R(out, badge="Database + Documents", sources=src, suggestions=default_suggestions(ctx))
 
     # ---- documents (RAG)
     a = knowledge.answer(text)
+    if not a["ai"] and a["sources"] and a["sources"][0]["type"] in ("CV", "JD"):
+        return menu_reply(ctx)
+    if not a["grounded"]:
+        return menu_reply(ctx)
     return R(a["text"], badge="Documents" if a["grounded"] else None, sources=a["sources"],
              suggestions=default_suggestions(ctx) if a["grounded"] else
              ["What can you do?", *default_suggestions(ctx)[:2]])
@@ -976,6 +1137,36 @@ def chat(sid: str, user: dict, text: str, attachments: list[dict], page: dict | 
     st["history"].append({"role": "assistant", **out})
     save_state(sid, user["id"], st)
     return out
+
+
+def chat_stream(sid: str, user: dict, text: str, attachments: list[dict], page: dict | None = None):
+    """Yield {"delta": text} pieces while the AI writes, then {"final": reply}. Quick answers come as one final."""
+    st = load_state(sid)
+    _MODE.stream = True
+    try:
+        try:
+            out = route(text, attachments, st, user, page)
+        except (ValueError, recruit.NotFound, ParseError) as e:
+            out = R(f"I couldn't do that: {e}")
+    finally:
+        _MODE.stream = False
+    spec = out.pop("_stream", None) if isinstance(out, dict) else None
+    if spec:
+        parts = []
+        for piece in llm.stream(spec["prompt"], max_tokens=700):
+            parts.append(piece)
+            yield {"delta": piece}
+        full = "".join(parts).strip()
+        if full:
+            out = R(full, badge="Database + Documents", sources=spec["src"], suggestions=default_suggestions(spec["ctx"]))
+        else:   # AI failed: use the document / menu answer instead
+            a = knowledge.answer(text)
+            out = (R(a["text"], badge="Documents", sources=a["sources"], suggestions=default_suggestions(spec["ctx"]))
+                   if a["grounded"] and a["sources"] and a["sources"][0]["type"] not in ("CV", "JD") else menu_reply(spec["ctx"]))
+    st["history"].append({"role": "user", "text": text, "files": [a["name"] for a in attachments]})
+    st["history"].append({"role": "assistant", **out})
+    save_state(sid, user["id"], st)
+    yield {"final": out}
 
 
 def history(sid: str) -> list[dict]:
