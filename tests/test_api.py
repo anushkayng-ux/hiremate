@@ -398,3 +398,15 @@ def test_team_management(c):
     me = users["admin@hiremate.demo"]["id"]
     assert c.patch(f"/settings/users/{me}", json={"active": False}).status_code == 409
     assert c.patch(f"/settings/users/{me}", json={"role": "Recruiter"}).status_code == 409
+
+
+def test_specific_answers_without_ai(c):
+    sid = str(uuid.uuid4())
+    r = chat(c, "Who should I hire first and why?", sid)
+    assert r["table"] and "My pick" in r["reply"]
+    r = chat(c, "Why is Priya Nair a good fit?", sid)
+    assert r["bullets"] and "Priya" in r["reply"]
+    r = chat(c, "What should I ask Imran in the interview?", sid)
+    assert r["table"]["rows"]
+    r = chat(c, "zzzz qqqq", sid)
+    assert "not in the data" in r["reply"].lower() and r["bullets"]
