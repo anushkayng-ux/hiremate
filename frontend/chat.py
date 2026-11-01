@@ -26,12 +26,23 @@ def send(text: str, files=None) -> None:
     data = {"session_id": sid, "message": text}
     ctx = st.session_state.get("view_ctx") or st.session_state.get("chat_ctx") or {}
     data |= {k: str(v) for k, v in ctx.items() if v}
-    with st.spinner("Thinking…"):
+    files_arg = [("files", (f.name, f.getvalue())) for f in files] if files else None
+    r = None
+    with st.chat_message("assistant", avatar=":material/auto_awesome:"):
+        box = st.empty()
+        box.markdown("_Thinking…_")
+        text_so_far = ""
         try:
-            r = api.post("/assistant/chat", data=data,
-                         files=[("files", (f.name, f.getvalue())) for f in files] if files else None)
+            for kind, val in api.stream_chat(data, files_arg):
+                if kind == "delta":
+                    text_so_far += val
+                    box.markdown(text_so_far + " ▌")
+                else:
+                    r = val
         except api.ApiError as e:
             r = {"reply": f"Sorry, that didn't work: {e.detail}", "suggestions": []}
+        if r is None:
+            r = {"reply": text_so_far or "Sorry, no answer came back. Please try again.", "suggestions": []}
     msgs.append({"role": "assistant", **r})
 
 

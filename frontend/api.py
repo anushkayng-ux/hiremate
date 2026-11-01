@@ -114,3 +114,29 @@ def portal_signup(name: str, email: str, password: str, job_id: int | None, f) -
     if r.status_code != 200:
         raise ApiError(r.status_code, r.json().get("detail", "Sign-up failed"))
     return r.json()
+
+
+def stream_chat(data, files=None):
+    """Generator: yields ("delta", text) while the AI writes, then ("final", reply dict)."""
+    import json as _json
+    try:
+        r = _session().post(API_URL + "/assistant/chat/stream", headers=_headers(), data=data, files=files,
+                            stream=True, timeout=120)
+    except requests.ConnectionError:
+        raise ApiError(0, "Can't reach the HireMate server. Is the backend running?") from None
+    if r.status_code == 401 and st.session_state.get("token"):
+        st.session_state.clear()
+        st.rerun()
+    if r.status_code >= 400:
+        try:
+            d = r.json().get("detail", r.text)
+        except ValueError:
+            d = r.text
+        raise ApiError(r.status_code, str(d))
+    for line in r.iter_lines(decode_unicode=True):
+        if line:
+            ev = _json.loads(line)
+            if "delta" in ev:
+                yield "delta", ev["delta"]
+            elif "final" in ev:
+                yield "final", ev["final"]
