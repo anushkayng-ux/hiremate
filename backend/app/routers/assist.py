@@ -107,7 +107,7 @@ def brief(page: str = "home", job_id: int | None = None, u=Depends(current_user)
     hit = _BRIEF.get(key)
     if hit and _t.time() - hit[0] < 900:
         return {"text": hit[1], "ai": True}
-    prompt = ("You are HireMate, a friendly recruiting assistant for the Vishal Mega Mart HR team. Write a short note for "
+    prompt = ("You are HireMate, a friendly recruiting assistant for an HR recruitment team. Write a short note for "
               f"{_FOCUS[page]}{extra} Use ONLY the data below. Very simple words. 2 or 3 short sentences, under 55 words, "
               "plain text, no headings, no bullets. Name the real people, jobs and numbers. End with one clear action.\n\n"
               f"DATA:\n{snap}")

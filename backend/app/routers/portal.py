@@ -60,9 +60,18 @@ def login(body: LoginIn):
 
 @portal.post("/signup")
 async def signup(name: str = Form(...), email: str = Form(...), password: str = Form(...),
-                 job_id: int | None = Form(None), text: str | None = Form(None), file: UploadFile | None = File(None)):
+                 job_id: int | None = Form(None), text: str | None = Form(None), file: UploadFile | None = File(None),
+                 consent: bool = Form(False), source: str | None = Form(None)):
+    if not consent:
+        raise HTTPException(422, "Please agree to the privacy notice so we can store and read your CV.")
     cv, fname = await _cv_text(file, text)
-    return _err(svc.signup, name, email, password, cv, job_id, fname)
+    r = _err(svc.signup, name, email, password, cv, job_id, fname)
+    from ..services import extras
+    extras.record_consent(r["candidate"]["id"])
+    if source and job_id:
+        from .. import db
+        db.run("UPDATE applications SET source=? WHERE candidate_id=? AND job_id=?", (source, r["candidate"]["id"], job_id))
+    return r
 
 
 @portal.get("/jobs/public")

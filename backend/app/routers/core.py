@@ -162,13 +162,19 @@ async def preview_cvs(files: list[UploadFile] = File(...), u=Depends(rec)):
 
 @cands.post("/upload")
 async def upload_cvs(files: list[UploadFile] = File(...), job_id: int | None = Form(None),
-                     allow_duplicate: bool = Form(False), u=Depends(rec)):
+                     allow_duplicate: bool = Form(False), source: str | None = Form(None),
+                     referred_by: str | None = Form(None), u=Depends(rec)):
     out = []
     for f in files:
         try:
             text = read_file(await f.read(), f.filename or "cv.txt")
             c = recruit.create_candidate(text, u["name"], source="Upload", file_name=f.filename, job_id=job_id,
                                          allow_duplicate=allow_duplicate)
+            if job_id and source:
+                a = recruit.app_for(job_id, c["id"])
+                if a:
+                    db.run("UPDATE applications SET source=?, referred_by=? WHERE id=?",
+                           (source, referred_by if source == "Referral" else None, a["id"]))
             out.append({"file_name": f.filename, "ok": True, "candidate": c})
         except (ValueError, ParseError) as e:
             out.append({"file_name": f.filename, "ok": False, "error": str(e)})
@@ -220,6 +226,8 @@ def add_note(cid: int, body: NoteIn, u=Depends(current_user)):
 class ApplyIn(BaseModel):
     job_id: int
     candidate_id: int
+    source: str | None = None
+    referred_by: str | None = None
 
 
 class StageIn(BaseModel):
@@ -233,7 +241,7 @@ class BulkIn(BaseModel):
 
 @apps.post("")
 def apply(body: ApplyIn, u=Depends(rec)):
-    return recruit.apply(body.job_id, body.candidate_id, u["name"])
+    return recruit.apply(body.job_id, body.candidate_id, u["name"], source=body.source, referred_by=body.referred_by)
 
 
 @apps.patch("/{app_id}")
