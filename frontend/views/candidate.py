@@ -131,21 +131,22 @@ if tab == "Overview":
             b.markdown('<p class="muted small" style="text-align:right;margin:0">Yellow = proof for a skill</p>',
                        unsafe_allow_html=True)
             ui.html_block(f'<div class="resume">{ui.highlight(c["cv_text"], [r["evidence"] for r in m["rows"] if r["status"] == "Proven"])}</div>')
-        with st.expander("Advanced details"):
-            fam = ", ".join(f"{f} {round(p * 100)}%" for f, p in c["family"])
-            st.caption(f"Score parts: skills {m['skill_score']} · CV text {m['text_score']} · experience {m['exp_score']}. "
-                       f"Job family guess: {fam}. Shortlist chance from past decisions: {round(m['shortlist_chance'] * 100)}%.")
-            ui.html_block(ui.skill_chips(m["rows"]))
-            sim = api.get(f"/candidates/{cid}/similar")
-            if sim:
-                st.markdown("**Similar people**")
-                for s in sim:
-                    if st.button(f"{ui.name(s['name'], s['id'])} · {s['headline']}", key=f"sim{s['id']}"):
-                        ui.open_candidate(s["id"], jid)
-            if c["roles"]:
-                st.markdown("**Work history**")
-                for r in c["roles"]:
-                    st.markdown(f"{r['role']}, {r['org']} · {r['dates']}")
+
+    with st.expander("Advanced details"):
+        fam = ", ".join(f"{f} {round(p * 100)}%" for f, p in c["family"])
+        st.caption(f"Score parts: skills {m['skill_score']} · CV text {m['text_score']} · experience {m['exp_score']}. "
+                   f"Job family guess: {fam}. Shortlist chance from past decisions: {round(m['shortlist_chance'] * 100)}%.")
+        ui.html_block(ui.skill_chips(m["rows"]))
+        sim = api.get(f"/candidates/{cid}/similar")
+        if sim:
+            st.markdown("**Similar people**")
+            for s in sim:
+                if st.button(f"{ui.name(s['name'], s['id'])} · {s['headline']}", key=f"sim{s['id']}"):
+                    ui.open_candidate(s["id"], jid)
+        if c["roles"]:
+            st.markdown("**Work history**")
+            for r in c["roles"]:
+                st.markdown(f"{r['role']}, {r['org']} · {r['dates']}")
 
 # ------------------------------------------------------------ interview
 if tab == "Interview":

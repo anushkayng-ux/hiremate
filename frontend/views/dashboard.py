@@ -76,6 +76,17 @@ with left:
                 if b.button("Open", key=f"wait{i}", width="stretch"):
                     ui.open_candidate(w["candidate_id"], w["job_id"])
 
+    with st.container(border=True):
+        st.markdown("### Upcoming interviews")
+        if not d["upcoming"]:
+            st.markdown('<p class="muted">No interviews booked.</p>', unsafe_allow_html=True)
+        for iv in d["upcoming"]:
+            ui.html_block(f'<div class="prow" style="margin:.2rem 0">{ui.avatar(iv["candidate"], size=36)}<div>'
+                          f'<b>{ui.esc(ui.name(iv["candidate"], iv["candidate_id"]))}</b> · '
+                          f'<span class="small">{ui.esc(iv["job_title"])}</span><br>'
+                          f'<span class="muted small">{ui.fmt_date(iv["date"])}, {ui.fmt_time(iv["time"])} · '
+                          f'{ui.esc(iv["mode"])}</span></div></div>')
+
 with right:
     inbox = ui.safe(api.get, "/emails/inbox/list") or []
     with st.container(border=True):
@@ -131,15 +142,5 @@ with right:
                        f'{ui.esc(r["location"])}</span><br><span class="small">{best}</span>', unsafe_allow_html=True)
             if b.button("Open", key=f"role{r['id']}", width="stretch"):
                 ui.open_job(r["id"])
-    with st.container(border=True):
-        st.markdown("### Upcoming interviews")
-        if not d["upcoming"]:
-            st.markdown('<p class="muted">No interviews booked.</p>', unsafe_allow_html=True)
-        for iv in d["upcoming"]:
-            ui.html_block(f'<div class="prow" style="margin:.2rem 0">{ui.avatar(iv["candidate"], size=36)}<div>'
-                          f'<b>{ui.esc(ui.name(iv["candidate"], iv["candidate_id"]))}</b> · '
-                          f'<span class="small">{ui.esc(iv["job_title"])}</span><br>'
-                          f'<span class="muted small">{ui.fmt_date(iv["date"])}, {ui.fmt_time(iv["time"])} · '
-                          f'{ui.esc(iv["mode"])}</span></div></div>')
     if st.button("See reports", icon=":material/insights:", width="stretch"):
         ui.go("analytics")
