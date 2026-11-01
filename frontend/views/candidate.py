@@ -126,14 +126,8 @@ if tab == "Overview":
             a, b = st.columns([3, 1.3], vertical_alignment="center")
             a.markdown("### Quick summary")
             if b.button("Write with AI" if key not in st.session_state else "Rewrite", key="sumbtn", width="stretch"):
-                with st.spinner("Reading the CV…"):
-                    st.session_state[key] = api.get("/ai/summary", job_id=jid, candidate_id=cid)
-            if key not in st.session_state:   # AI writes the summary on its own when the page opens
                 with st.spinner("AI is reading the CV…"):
-                    try:
-                        st.session_state[key] = api.get("/ai/summary", job_id=jid, candidate_id=cid)
-                    except api.ApiError:
-                        pass
+                    st.session_state[key] = api.get("/ai/summary", job_id=jid, candidate_id=cid)
             if key in st.session_state:
                 s = st.session_state[key]
                 st.markdown(s["text"])
@@ -243,12 +237,6 @@ if tab == "Interview":
             qk = f"q{cid}-{jid}"
             if cur and cur.get("questions") and qk not in st.session_state:
                 st.session_state[qk] = cur["questions"]
-            if qk not in st.session_state:   # AI writes the questions on its own when this tab opens
-                with st.spinner("AI is writing questions from the CV and the job…"):
-                    try:
-                        st.session_state[qk] = api.get("/ai/questions", job_id=jid, candidate_id=cid)["questions"]
-                    except api.ApiError:
-                        pass
             if st.button("Write questions with AI" if qk not in st.session_state else "Regenerate"):
                 with st.spinner("Writing questions from the CV and the job…"):
                     st.session_state[qk] = api.get("/ai/questions", job_id=jid, candidate_id=cid)["questions"]
