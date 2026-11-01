@@ -220,6 +220,12 @@ if tab == "Interview":
             qk = f"q{cid}-{jid}"
             if cur and cur.get("questions") and qk not in st.session_state:
                 st.session_state[qk] = cur["questions"]
+            if qk not in st.session_state:   # AI writes the questions on its own when this tab opens
+                with st.spinner("AI is writing questions from the CV and the job…"):
+                    try:
+                        st.session_state[qk] = api.get("/ai/questions", job_id=jid, candidate_id=cid)["questions"]
+                    except api.ApiError:
+                        pass
             if st.button("Write questions with AI" if qk not in st.session_state else "Regenerate"):
                 with st.spinner("Writing questions from the CV and the job…"):
                     st.session_state[qk] = api.get("/ai/questions", job_id=jid, candidate_id=cid)["questions"]

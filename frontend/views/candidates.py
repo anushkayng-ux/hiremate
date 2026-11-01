@@ -9,6 +9,7 @@ jobs = api.get("/jobs")
 h1, h2 = st.columns([4, 1.2], vertical_alignment="center")
 with h1:
     ui.header("Candidates", sub="Everyone who sent a CV, for all jobs.")
+ui.ai_note("candidates")
 if h2.button("Add CVs", icon=":material/add:", type="primary", width="stretch", disabled=not rec):
     widgets.upload_cvs()
 

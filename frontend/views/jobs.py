@@ -62,6 +62,7 @@ def create_dialog():
 h1, h2 = st.columns([4, 1.2], vertical_alignment="center")
 with h1:
     ui.header("Jobs", sub="Open a job to see its candidates, best match first.")
+ui.ai_note("jobs")
 rec = st.session_state.user["role"] in ("Admin", "Recruiter")
 if h2.button("New job", icon=":material/add:", type="primary", width="stretch", disabled=not rec) \
         or st.session_state.pop("open_create", False):

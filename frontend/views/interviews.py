@@ -4,6 +4,7 @@ import api
 import ui
 
 ui.header("Interviews", sub="Booked interviews. Open one to add feedback.")
+ui.ai_note("interviews")
 tab1, tab2 = st.tabs(["Upcoming", "Past"])
 for tab, when in ((tab1, "upcoming"), (tab2, "past")):
     with tab:
