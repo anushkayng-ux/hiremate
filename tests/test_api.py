@@ -434,6 +434,17 @@ def test_logs_admin_only_and_settings_roles(c):
         assert rc.get("/settings/ai").status_code == 200
 
 
+def _sse(text):
+    import json as _json
+    out, ev = [], ""
+    for ln in text.splitlines():
+        if ln.startswith("event:"):
+            ev = ln[6:].strip()
+        elif ln.startswith("data:") and ev in ("delta", "final"):
+            out.append({ev: _json.loads(ln[5:])})
+    return out
+
+
 def test_streaming_chat(c, monkeypatch):
     import json as _json
     from backend.app.adapters import llm as llm_mod
@@ -446,13 +457,53 @@ def test_streaming_chat(c, monkeypatch):
             yield "Priya "
             yield "leads. [1]"
     monkeypatch.setattr(llm_mod, "get_llm", lambda: Fake())
-    # quick data answers arrive as one final message
+    # data answers keep their table, and the AI explains them in its own words
     r = c.post("/assistant/chat/stream", data={"session_id": "st1", "message": "Who should I hire first and why?"})
-    evs = [_json.loads(x) for x in r.text.splitlines() if x]
-    assert evs[-1]["final"]["table"] and not any("delta" in e for e in evs)
+    evs = _sse(r.text)
+    assert evs[-1]["final"]["table"] and evs[-1]["final"]["badge"] == "AI + Database"
+    assert evs[-1]["final"]["reply"] == "Priya leads. [1]"
     # free-form questions stream piece by piece, then save the full answer
     r = c.post("/assistant/chat/stream", data={"session_id": "st2", "message": "How is morale in the stores?"})
-    evs = [_json.loads(x) for x in r.text.splitlines() if x]
-    assert [e["delta"] for e in evs if "delta" in e] == ["Priya ", "leads. [1]"]
+    evs = _sse(r.text)
+    assert "".join(e["delta"] for e in evs if "delta" in e) == "Priya leads. [1]"
     assert evs[-1]["final"]["reply"] == "Priya leads. [1]"
     assert c.get("/assistant/history/st2").json()[-1]["reply"] == "Priya leads. [1]"
+
+
+def test_followup_uses_history_and_model_fallback(c, monkeypatch):
+    from backend.app.adapters import llm as llm_mod
+    seen = []
+
+    class Fake:
+        name = "fake"
+        def generate(self, prompt, system="", max_tokens=0):
+            seen.append(prompt)
+            return "Two people applied. [1]"
+        def stream(self, prompt, system="", max_tokens=0):
+            seen.append(prompt)
+            yield "Two people applied."
+    monkeypatch.setattr(llm_mod, "get_llm", lambda: Fake())
+    c.post("/assistant/chat", data={"session_id": "fu1", "message": "Who should I hire first and why?"})
+    r = c.post("/assistant/chat", data={"session_id": "fu1", "message": "write a paragraph"})
+    assert r.json()["reply"].startswith("Two people")
+    assert "CONVERSATION SO FAR" in seen[-1] and "Who should I hire first" in seen[-1]
+
+
+def test_gemini_skips_busy_model(monkeypatch):
+    from backend.app.adapters import llm as llm_mod
+
+    class Resp:
+        def __init__(self, code, body=None): self.status_code, self._b, self.text = code, body or {}, "x"
+        def json(self): return self._b
+    calls = []
+
+    def fake_post(url, **kw):
+        calls.append(url)
+        if "flash-lite" in url:
+            return Resp(503)
+        return Resp(200, {"candidates": [{"content": {"parts": [{"text": "hi"}]}}]})
+    g = llm_mod.GeminiLLM("k", "gemini-2.5-flash-lite")
+    g._all = ["gemini-2.5-flash-lite", "gemini-2.0-flash"]
+    monkeypatch.setattr(llm_mod.requests, "post", fake_post)
+    assert g.generate("q") == "hi"
+    assert g.model == "gemini-2.0-flash" and len(calls) == 2
