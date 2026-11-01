@@ -299,13 +299,21 @@ async def chat_stream(session_id: str = Form(...), message: str = Form(""), job_
     from fastapi.responses import StreamingResponse
     atts = await _atts(files_, u)
 
+    def sse(event: str, data) -> str:
+        return f"event: {event}\ndata: {_json.dumps(data, default=str)}\n\n"
+
     def gen():
+        yield sse("start", {"ok": True})   # tells the page at once that the server is working
         try:
             for ev in assistant.chat_stream(session_id, u, message, atts, {"job_id": job_id, "candidate_id": candidate_id}):
-                yield _json.dumps(ev, default=str) + "\n"
+                kind = "delta" if "delta" in ev else "final"
+                yield sse(kind, ev[kind])
         except Exception as e:   # never cut the stream mid-way: tell the page to use the normal answer
-            yield _json.dumps({"error": str(e)[:200]}) + "\n"
-    return StreamingResponse(gen(), media_type="application/x-ndjson", headers={"X-Accel-Buffering": "no"})
+            yield sse("error", {"error": str(e)[:200]})
+        yield sse("done", {})
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache, no-transform", "Connection": "keep-alive",
+                                      "X-Accel-Buffering": "no"})
 
 
 @bot.post("/chat")
