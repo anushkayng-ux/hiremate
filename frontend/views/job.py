@@ -137,8 +137,16 @@ if view == "Job details":
         for f in api.get(f"/jobs/{jid}/check"):
             (st.success if f["level"] == "good" else st.warning if f["level"] == "warn" else st.error)(
                 f"{f['title']} — {f['fix']}")
-        with st.expander("Full job description"):
-            st.text(job["description"])
+        st.markdown("**Job description (JD)**")
+        st.download_button("Download JD", job["description"], file_name=f"JD - {job['title']}.txt", icon=":material/download:",
+                           key=f"jdl{jid}", width="stretch")
+        with st.expander("View / edit the full JD", expanded=False):
+            new_jd = st.text_area("Edit the JD text", job["description"], height=320, key=f"jded{jid}",
+                                  label_visibility="collapsed", disabled=not rec)
+            if st.button("Save JD", key=f"jdsave{jid}", type="primary", disabled=not rec or new_jd.strip() == job["description"].strip()):
+                api.patch(f"/jobs/{jid}", json={"description": new_jd.strip()})
+                ui.toast_next("JD saved. Candidates re-ranked.")
+                st.rerun()
 
 # ------------------------------------------------------------ rules
 if view == "Your rules":

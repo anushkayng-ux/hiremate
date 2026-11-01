@@ -126,10 +126,11 @@ if tab == "Overview":
                             unsafe_allow_html=True)
     with right:
         with st.container(border=True):
-            a, b = st.columns([1, 2], vertical_alignment="center")
+            a, b = st.columns([1, 1.6], vertical_alignment="center")
             a.markdown("### CV")
-            b.markdown('<p class="muted small" style="text-align:right;margin:0">Yellow = proof for a skill</p>',
-                       unsafe_allow_html=True)
+            b.download_button("Download CV", c["cv_text"], file_name=f"CV - {c['name']}.txt", icon=":material/download:",
+                              key=f"cvdl{cid}", width="stretch")
+            st.caption("Yellow = proof for a skill")
             ui.html_block(f'<div class="resume">{ui.highlight(c["cv_text"], [r["evidence"] for r in m["rows"] if r["status"] == "Proven"])}</div>')
 
     with st.expander("Advanced details"):
