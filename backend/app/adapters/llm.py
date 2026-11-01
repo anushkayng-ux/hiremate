@@ -58,17 +58,47 @@ def _ai_settings() -> dict:
 
 class GeminiLLM:
     def __init__(self, key: str, model: str, paid: bool = False) -> None:
-        self.key, self.model = key, model
+        self.key, self.model, self.paid = key, model, paid
         self.name = f"Gemini ({model}){' · paid' if paid else ' · free tier'}"
 
-    def generate(self, prompt: str, system: str = SYSTEM, max_tokens: int = 900) -> str:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
-        r = requests.post(url, params={"key": self.key}, timeout=config.LLM_TIMEOUT, json={
+    BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+
+    def _pick_model(self) -> str | None:
+        """Ask Google which models this key can use and choose a Flash model."""
+        r = requests.get(self.BASE, params={"key": self.key, "pageSize": 100}, timeout=config.LLM_TIMEOUT)
+        r.raise_for_status()
+        names = [m["name"].split("/", 1)[-1] for m in r.json().get("models", [])
+                 if "generateContent" in m.get("supportedGenerationMethods", [])]
+        def rank(n: str):
+            bad = any(x in n for x in ("lite", "image", "tts", "live", "thinking", "embedding", "audio", "preview", "exp"))
+            return (bad, "flash" not in n, n != "gemini-flash-latest", n)
+        good = sorted((n for n in names if n.startswith("gemini") and "flash" in n), key=rank)
+        return good[0] if good else None
+
+    def _call(self, model: str, prompt: str, system: str, max_tokens: int) -> str:
+        r = requests.post(f"{self.BASE}/{model}:generateContent", params={"key": self.key}, timeout=config.LLM_TIMEOUT, json={
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.2, "maxOutputTokens": max_tokens}})
-        r.raise_for_status()
+        if r.status_code >= 400:
+            # never put the key (it is in the URL) into logs or errors
+            raise RuntimeError(f"Gemini {r.status_code} for model {model}: {r.text[:200]}")
         return "".join(p.get("text", "") for p in r.json()["candidates"][0]["content"]["parts"])
+
+    def generate(self, prompt: str, system: str = SYSTEM, max_tokens: int = 900) -> str:
+        try:
+            return self._call(self.model, prompt, system, max_tokens)
+        except RuntimeError as e:
+            if " 404 " not in str(e) and "not found" not in str(e).lower():
+                raise
+            alt = self._pick_model()
+            if not alt or alt == self.model:
+                raise
+            out = self._call(alt, prompt, system, max_tokens)
+            self.model = alt
+            self.name = f"Gemini ({alt}){' · paid' if self.paid else ' · free tier'}"
+            log.info("Gemini model switched to %s", alt)
+            return out
 
 
 class ClaudeLLM:
